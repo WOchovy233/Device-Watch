@@ -66,7 +66,7 @@ data class DashboardUiState(
     val deviceInfo: DeviceInfo? = null,
     val isRefreshing: Boolean = false,
     val isWidgetInstalled: Boolean = false,
-    val hideWidgetHint: Boolean = false, // 🎯 新增：控制主页牛皮癣
+    val hideWidgetHint: Boolean = false, 
     val lastUpdated: String = "--:--",
     val widgetOpacity: Float = DEFAULT_WIDGET_OPACITY,
     val widgetBlackBackground: Boolean = false,
@@ -132,7 +132,7 @@ class DashboardViewModel @Inject constructor(
             it.copy(
                 onboardingCompleted = settings.onboardingShown(),
                 classicLook = settings.classicLook(),
-                hideWidgetHint = settings.hideWidgetHint(), // 🎯 初始化读取
+                hideWidgetHint = settings.hideWidgetHint(), 
                 rootStatus = if (access == PrivilegedAccess.ROOT) RootStatus.ON else RootStatus.OFF,
                 shizukuStatus = if (access == PrivilegedAccess.SHIZUKU) ShizukuStatus.ON else ShizukuStatus.OFF,
                 enabledAlerts = HealthAlert.entries.filter(settings::alertEnabled).toSet(),
@@ -157,7 +157,6 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch { repository.latestStats.filterNotNull().collect(::publishStats) }
     }
 
-    // 🎯 新增：用户点击关闭
     fun onHideWidgetHint() {
         settings.setHideWidgetHint(true)
         _uiState.update { it.copy(hideWidgetHint = true) }
@@ -167,14 +166,15 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isExemptAppsLoading = true) }
             try {
-                // 修复：拆开 if-else，让编译器能正确识别 exec 方法
+                // 修复：使用正确的 run 方法，并传入超时时间 10000 毫秒
                 val output = withContext(Dispatchers.IO) {
                     if (settings.privilegedAccess() == PrivilegedAccess.ROOT) {
-                        rootShell.exec("dumpsys deviceidle whitelist")
+                        rootShell.run("dumpsys deviceidle whitelist", 10_000L)
                     } else {
-                        shizukuShell.exec("dumpsys deviceidle whitelist")
+                        shizukuShell.run("dumpsys deviceidle whitelist", 10_000L)
                     }
-                }
+                } ?: "" // 修复：如果返回 null，给个空字符串，防止下面的 .lines() 崩溃
+                
                 val list = output.lines().map { it.trim() }.filter { it.isNotEmpty() && it.contains(",") }.map { line ->
                     val parts = line.split(",")
                     if (parts.size >= 3) parts[2] else line
@@ -190,12 +190,12 @@ class DashboardViewModel @Inject constructor(
     fun removeExemptApp(packageName: String) {
         viewModelScope.launch {
             try {
-                // 修复：拆开 if-else，让编译器能正确识别 exec 方法
+                // 修复：使用正确的 run 方法，并传入超时时间 10000 毫秒
                 withContext(Dispatchers.IO) {
                     if (settings.privilegedAccess() == PrivilegedAccess.ROOT) {
-                        rootShell.exec("dumpsys deviceidle whitelist -$packageName")
+                        rootShell.run("dumpsys deviceidle whitelist -$packageName", 10_000L)
                     } else {
-                        shizukuShell.exec("dumpsys deviceidle whitelist -$packageName")
+                        shizukuShell.run("dumpsys deviceidle whitelist -$packageName", 10_000L)
                     }
                 }
                 loadExemptApps()
