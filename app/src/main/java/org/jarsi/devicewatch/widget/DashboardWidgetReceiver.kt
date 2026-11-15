@@ -39,9 +39,11 @@ class DashboardWidgetReceiver : GlanceAppWidgetReceiver() {
             e.printStackTrace()
         }
 
+        // 🎯 修改点：加上了 ACTION_POWER_CONNECTED，插电立刻唤醒服务
         if (action == Intent.ACTION_BOOT_COMPLETED ||
             action == "android.appwidget.action.APPWIDGET_UPDATE" ||
-            action == Intent.ACTION_USER_PRESENT
+            action == Intent.ACTION_USER_PRESENT ||
+            action == Intent.ACTION_POWER_CONNECTED
         ) {
             startMonitorService(context)
         }
