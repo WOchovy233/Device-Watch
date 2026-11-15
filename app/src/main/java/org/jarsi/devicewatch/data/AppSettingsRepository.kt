@@ -40,6 +40,14 @@ interface AppSettingsRepository {
 
     fun setChargeLimitPercent(value: Int)
 
+    // 🎯 新增：充电提醒是否播放声音
+    fun chargeLimitPlaySound(): Boolean
+    fun setChargeLimitPlaySound(enabled: Boolean)
+
+    // 🎯 新增：充电提醒是否震动
+    fun chargeLimitVibrate(): Boolean
+    fun setChargeLimitVibrate(enabled: Boolean)
+
     /** Mobile-data allowance per counting period in GB; 0 = no quota, otherwise 1..500. */
     fun dataQuotaGb(): Double
 
