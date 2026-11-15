@@ -435,25 +435,35 @@ class SystemMonitorService : Service() {
     }
 
     private suspend fun liveText(chosen: Set<QuickMetric>, stats: SystemStats): LiveNotificationText? {
-        // 🎯 核心修改：这里不再调 quickStats.dataToday()，而是用周期数据直接拼装
-        val dataToday = if (QuickMetric.DATA_TODAY in chosen) {
-            val used = stats.mobileDataUsedGb
-            val total = stats.mobileDataTotalGb
-            if (total > 0.0) {
-                val remain = (total - used).coerceAtLeast(0.0)
-                // 直接显示 "已用70.0G/剩50.0G"
-                String.format(Locale.getDefault(), "已用%.1fG/剩%.1fG", used, remain)
-            } else {
-                // 如果没设置套餐上限，就显示已用
-                String.format(Locale.getDefault(), "%.1fG", used)
-            }
-        } else null
-
+        // 1. 先按原版的规范来，拿到这个对象，这样就不会报类型不匹配的错
+        val dataToday = if (QuickMetric.DATA_TODAY in chosen) quickStats.dataToday() else null
         val labels = quickMetricLabels(applicationContext)
         val extendedAccess = appSettings.privilegedAccess() != PrivilegedAccess.OFF
-        val readings = QuickMetric.entries.filter { it in chosen }
-            .map { QuickMetricFormatter.read(it, stats, dataToday, extendedAccess, labels) }
-        return liveNotificationText(readings, labels)
+        
+        // 2. 拿到原版算出来的列表（它可能只显示今日流量）
+        val filteredMetrics = QuickMetric.entries.filter { it in chosen }
+        val originalReadings = filteredMetrics.map { QuickMetricFormatter.read(it, stats, dataToday, extendedAccess, labels) }
+
+        // 3. 我们自己算一下“已用/剩余”
+        val used = stats.mobileDataUsedGb
+        val total = stats.mobileDataTotalGb
+        val customDataText = if (total > 0.0) {
+            val remain = (total - used).coerceAtLeast(0.0)
+            String.format(Locale.getDefault(), "已用%.1fG/剩%.1fG", used, remain)
+        } else {
+            String.format(Locale.getDefault(), "%.1fG", used)
+        }
+
+        // 4. 移花接木：把原版列表里那个“流量”的项，强行替换成咱们算好的文字
+        val finalReadings = originalReadings.mapIndexed { index, originalText ->
+            if (filteredMetrics[index] == QuickMetric.DATA_TODAY) {
+                customDataText
+            } else {
+                originalText
+            }
+        }
+
+        return liveNotificationText(finalReadings, labels)
     }
 
     @Synchronized
