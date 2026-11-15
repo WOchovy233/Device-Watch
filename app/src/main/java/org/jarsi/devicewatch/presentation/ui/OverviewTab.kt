@@ -51,6 +51,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.jarsi.devicewatch.R
 import org.jarsi.devicewatch.data.ChargeSource
 import org.jarsi.devicewatch.data.ChargingState
@@ -59,6 +61,7 @@ import org.jarsi.devicewatch.data.DataQuotaLogic
 import org.jarsi.devicewatch.data.ThermalLevel
 import org.jarsi.devicewatch.data.TrafficSplit
 import org.jarsi.devicewatch.data.UNAVAILABLE_TEXT
+import org.jarsi.devicewatch.presentation.AppsViewModel
 import org.jarsi.devicewatch.presentation.DashboardUiState
 import org.jarsi.devicewatch.presentation.PeriodComparison
 import org.jarsi.devicewatch.ui.theme.STATUS_TINT_ALPHA
@@ -73,9 +76,14 @@ internal fun OverviewTab(
     onOpenHistory: () -> Unit,
     onOpenSinceCharge: () -> Unit,
     onHideWidgetHint: () -> Unit,
+    // 🎯 核心修复：把应用页面的 ViewModel 注入进来拿流量数据
+    appsViewModel: AppsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val currentStats = uiState.stats ?: return
+
+    // 🎯 拿到应用页面的状态（包含所有 App 的流量清单）
+    val appsUiState by appsViewModel.uiState.collectAsStateWithLifecycle()
 
     // 🎯 用于暂存导出文本内容
     var exportTextContent by remember { mutableStateOf("") }
@@ -413,7 +421,7 @@ internal fun OverviewTab(
             }
         }
 
-        // 🎯 流量统计卡片（包含导出功能）
+        // 🎯 流量统计卡片（核心修复：使用 appsUiState.dataConsumers 导出）
         SettingsSectionCard(titleRes = R.string.data_counter_section) {
             StackedMetricRow(
                 label = stringResource(wifiDataLabelRes(uiState.dataCounterMode)),
@@ -456,7 +464,7 @@ internal fun OverviewTab(
                 )
             }
 
-            // 🎯 导出按钮逻辑
+            // 🎯 导出按钮
             Spacer(modifier = Modifier.height(12.dp))
             TextButton(
                 onClick = withTapHaptic {
@@ -466,12 +474,11 @@ internal fun OverviewTab(
                     sb.append("统计周期: ${if (uiState.dataCounterMode == DataCounterMode.DAY) "今日" else "本月（计费周期）"}\n")
                     sb.append("==============================\n\n")
                     
-                    // 按流量从大到小排序，全量输出，绝对不截断！
-                    val sortedData = uiState.dataConsumers.sortedByDescending { it.bytes }
+                    // 🎯 核心：从 appsUiState 拿到所有 App 的流量数据并全量输出
+                    val sortedData = appsUiState.dataConsumers.sortedByDescending { it.bytes }
                     var count = 0
                     
                     sortedData.forEach { consumer ->
-                        // 只要能读出字节数，大于 0 就记录，连 1 个字节的跑冒滴漏都不放过
                         if (consumer.bytes > 0) {
                             val pkgName = consumer.packageName ?: "无包名(系统服务)"
                             sb.append("📦 应用名称: ${consumer.label}\n")
