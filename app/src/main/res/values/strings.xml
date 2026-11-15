@@ -1064,4 +1064,8 @@
     <string name="single_widget_description">您选择的一个数字：电池、温度、今日流量、运行时间、处理器、内存、存储或电池功率。</string>
     <string name="single_widget_pick_title">选择数字</string>
     <string name="monitor_live_channel_description">在设置中选择的数字，屏幕开启时保持更新。</string>
+    <string name="charge_limit_sound_title">提醒声音</string>
+    <string name="charge_limit_sound_description">达到设定电量时发出系统提示音</string>
+    <string name="charge_limit_vibrate_title">提醒震动</string>
+    <string name="charge_limit_vibrate_description">达到设定电量时让手机震动一下</string>
 </resources>
