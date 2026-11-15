@@ -15,20 +15,11 @@ import androidx.core.content.ContextCompat
 import org.jarsi.devicewatch.MainActivity
 import org.jarsi.devicewatch.R
 
-/**
- * "You can unplug now" reminder for the user-chosen charge level. Shares the
- * battery-alerts channel with [BatteryFullNotifier] but uses its own notification
- * id, so a full-charge alert never replaces this one.
- */
 object ChargeLimitNotifier {
-    private const val CHANNEL_ID = "battery_full_channel"
+    // 🎯 保持 v2 后缀，因为系统有缓存，换个 ID 才会应用新规则
+    private const val CHANNEL_ID = "battery_full_channel_v2"
     private const val NOTIFICATION_ID = 1003
 
-    /**
-     * Posts the reminder and reports whether it was actually handed to the system.
-     * The caller latches "notified this plug session" only on true: a reminder
-     * refused for a missing permission must be retried on the next broadcast.
-     */
     @SuppressLint("MissingPermission")
     fun show(context: Context, levelPercent: Int): Boolean {
         if (!canPostNotifications(context)) return false
@@ -42,6 +33,7 @@ object ChargeLimitNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // 🎯 把闹钟级别去掉了，恢复普通高优先级通知，只响一下
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(
@@ -50,19 +42,18 @@ object ChargeLimitNotifier {
             .setContentText(context.getString(R.string.charge_limit_notification_text))
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL) // 默认的声音+震动
             .build()
 
         return try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
             true
         } catch (_: SecurityException) {
-            // Permission can still be revoked between the check and notify().
             false
         }
     }
 
-    /** Clears the reminder once the charger is out — its advice no longer applies. */
     fun cancel(context: Context) {
         NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
     }
@@ -75,7 +66,6 @@ object ChargeLimitNotifier {
             ) == PackageManager.PERMISSION_GRANTED
     }
 
-    /** The app-level switch and the channel block both make notify() a silent no-op. */
     private fun canReachUser(context: Context): Boolean {
         val manager = NotificationManagerCompat.from(context)
         return NotificationDelivery.canReachUser(
@@ -90,9 +80,13 @@ object ChargeLimitNotifier {
         val channel = NotificationChannel(
             CHANNEL_ID,
             context.getString(R.string.battery_full_channel_name),
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = context.getString(R.string.battery_full_channel_description)
+            enableVibration(true) 
+            // 🎯 震动模式改温和：延迟0，震150毫秒，停一下，就一下！
+            vibrationPattern = longArrayOf(0, 150) 
+            enableLights(true) 
         }
 
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
