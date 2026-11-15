@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -53,9 +55,10 @@ internal fun DeviceTab(
     uiState: DashboardUiState,
     kernelBand: KernelBandState = KernelBandState(),
     onOpenKernel: () -> Unit = {},
-    viewModel: DashboardViewModel = hiltViewModel(), // 🎯 必须引入 ViewModel 来执行命令
+    viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val currentStats = uiState.stats ?: return
+    val context = LocalContext.current
 
     // 🎯 新增：全量免优化名单的弹窗状态
     var showExemptDialog by remember { mutableStateOf(false) }
@@ -70,17 +73,48 @@ internal fun DeviceTab(
                     Row(modifier = Modifier.fillMaxWidth().padding(32.dp), horizontalArrangement = Arrangement.Center) {
                         CircularProgressIndicator()
                     }
-                } else if (uiState.exemptAppsList.isNullOrEmpty()) { // 🎯 修复：isNullOrEmpty 防止空指针
+                } else if (uiState.exemptAppsList.isNullOrEmpty()) { 
                     Text("暂无数据（请确保已开启 Shizuku 或 Root 权限）")
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
-                        items(uiState.exemptAppsList) { pkg ->
+                        items(uiState.exemptAppsList) { rawItem ->
+                            // 🎯 核心修复：把纯数字(UID)转换成包名，进而获取应用名字和图标
+                            val actualPackage = if (rawItem.toIntOrNull() != null) {
+                                try {
+                                    context.packageManager.getPackagesForUid(rawItem.toInt())?.firstOrNull()
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            } else {
+                                rawItem
+                            }
+
+                            val appLabel = if (actualPackage != null) {
+                                try {
+                                    val appInfo = context.packageManager.getApplicationInfo(actualPackage, 0)
+                                    context.packageManager.getApplicationLabel(appInfo).toString()
+                                } catch (e: Exception) {
+                                    actualPackage
+                                }
+                            } else {
+                                "未知应用 ($rawItem)"
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = pkg, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                                IconButton(onClick = { viewModel.removeExemptApp(pkg) }) {
+                                // 🎯 核心修复：显示 App 图标
+                                if (actualPackage != null) {
+                                    AppIcon(actualPackage, modifier = Modifier.size(24.dp))
+                                } else {
+                                    Spacer(modifier = Modifier.size(24.dp))
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                // 🎯 核心修复：显示 App 名字
+                                Text(text = appLabel, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                
+                                IconButton(onClick = { viewModel.removeExemptApp(actualPackage ?: rawItem) }) {
                                     Icon(
                                         imageVector = Icons.Outlined.Delete,
                                         contentDescription = "移出白名单",
@@ -191,7 +225,6 @@ internal fun DeviceTab(
                 DeviceFact(R.string.power_device_idle, state.deviceIdle)
                 DeviceFact(R.string.power_battery_optimization_exempt, state.batteryOptimizationExempt)
                 
-                // 🎯 新增：把原来的 DeviceFact 替换成可以点击的模块
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -208,7 +241,7 @@ internal fun DeviceTab(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = state.otherExemptApps ?: "未知", // 🎯 修复：可空字符串安全兜底
+                        text = state.otherExemptApps ?: "未知", 
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
