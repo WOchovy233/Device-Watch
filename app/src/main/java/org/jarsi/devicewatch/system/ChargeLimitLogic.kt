@@ -1,10 +1,8 @@
 package org.jarsi.devicewatch.system
 
 /**
- * Pure rules for the adjustable charge-limit reminder — no clock, no Android.
- * The reminder fires at most once per plug session, so a charger left connected
- * overnight cannot repeat it on every battery broadcast; [onPowerDisconnected]
- * clears the latch for the next session.
+ * Pure rules for the adjustable charge-limit reminder.
+ * 只要插上电，达到阈值就必须提醒。
  */
 object ChargeLimitLogic {
 
@@ -13,9 +11,8 @@ object ChargeLimitLogic {
     data class Decision(val state: State, val notify: Boolean)
 
     /**
-     * [limitPercent] <= 0 disables the reminder. Fires once per plug session when
-     * charging and [level] has reached the limit; a limit of 100 or more never
-     * fires, because the battery-full notification already covers that case.
+     * [limitPercent] <= 0 disables the reminder. 
+     * 只要达到设定电量且插着电，就直接触发通知。
      */
     fun onBatteryChanged(
         state: State,
@@ -24,9 +21,17 @@ object ChargeLimitLogic {
         isPlugged: Boolean,
     ): Decision {
         if (limitPercent <= 0 || limitPercent >= 100) return Decision(state, notify = false)
-        if (!isPlugged || level < limitPercent || state.notifiedThisPlug) {
+        
+        // 如果没插电，或者电量还没到，就不通知
+        if (!isPlugged || level < limitPercent) {
             return Decision(state, notify = false)
         }
+        
+        // 如果这次插电已经通知过了，就不再骚扰（拔掉充电器会重置这个状态）
+        if (state.notifiedThisPlug) {
+            return Decision(state, notify = false)
+        }
+        
         return Decision(State(notifiedThisPlug = true), notify = true)
     }
 
