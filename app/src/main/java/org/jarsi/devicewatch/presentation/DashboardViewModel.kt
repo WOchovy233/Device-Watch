@@ -166,18 +166,24 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isExemptAppsLoading = true) }
             try {
-                // 修复：使用正确的 run 方法，并传入超时时间 10000 毫秒
                 val output = withContext(Dispatchers.IO) {
                     if (settings.privilegedAccess() == PrivilegedAccess.ROOT) {
                         rootShell.run("dumpsys deviceidle whitelist", 10_000L)
                     } else {
                         shizukuShell.run("dumpsys deviceidle whitelist", 10_000L)
                     }
-                } ?: "" // 修复：如果返回 null，给个空字符串，防止下面的 .lines() 崩溃
+                } ?: ""
                 
-                val list = output.lines().map { it.trim() }.filter { it.isNotEmpty() && it.contains(",") }.map { line ->
+                // 优化解析：提取真实的包名或 UID
+                val list = output.lines().map { it.trim() }.filter { it.isNotEmpty() && it.contains(",") }.mapNotNull { line ->
                     val parts = line.split(",")
-                    if (parts.size >= 3) parts[2] else line
+                    if (parts.size >= 3) {
+                        parts[2].trim() 
+                    } else if (parts.size == 2) {
+                        parts[1].trim() 
+                    } else {
+                        null
+                    }
                 }.distinct()
                 _uiState.update { it.copy(exemptAppsList = list, isExemptAppsLoading = false) }
             } catch (e: Exception) {
@@ -190,7 +196,6 @@ class DashboardViewModel @Inject constructor(
     fun removeExemptApp(packageName: String) {
         viewModelScope.launch {
             try {
-                // 修复：使用正确的 run 方法，并传入超时时间 10000 毫秒
                 withContext(Dispatchers.IO) {
                     if (settings.privilegedAccess() == PrivilegedAccess.ROOT) {
                         rootShell.run("dumpsys deviceidle whitelist -$packageName", 10_000L)
