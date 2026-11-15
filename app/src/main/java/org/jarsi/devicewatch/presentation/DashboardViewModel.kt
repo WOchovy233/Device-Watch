@@ -77,6 +77,11 @@ data class DashboardUiState(
     val cycleStartDay: Int = 1,
     /** Charge-reminder level in percent; 0 = reminder off. */
     val chargeLimitPercent: Int = 0,
+    
+    // 🎯 新增：充电提醒的声音和震动开关
+    val chargeLimitPlaySound: Boolean = true,
+    val chargeLimitVibrate: Boolean = true,
+
     /** Mobile-data allowance per counting period in GB; 0 = no quota. */
     val dataQuotaGb: Double = 0.0,
     // Usage counters, scoped to the selected counting period (day or billing cycle).
@@ -729,6 +734,9 @@ class DashboardViewModel @Inject constructor(
                 cycleStartDay = settings.cycleStartDay(),
                 chargeLimitPercent = settings.chargeLimitPercent(),
                 dataQuotaGb = settings.dataQuotaGb(),
+                // 🎯 新增：加载这两个开关的状态
+                chargeLimitPlaySound = settings.chargeLimitPlaySound(),
+                chargeLimitVibrate = settings.chargeLimitVibrate(),
             )
         }
     }
@@ -771,6 +779,18 @@ class DashboardViewModel @Inject constructor(
     fun onCommitChargeLimit() {
         settings.setChargeLimitPercent(_uiState.value.chargeLimitPercent)
         monitorRelay.chargeLimitChanged()
+    }
+
+    // 🎯 新增：保存声音开关状态
+    fun onChargeLimitPlaySoundToggle(enabled: Boolean) {
+        settings.setChargeLimitPlaySound(enabled)
+        _uiState.update { it.copy(chargeLimitPlaySound = enabled) }
+    }
+
+    // 🎯 新增：保存震动开关状态
+    fun onChargeLimitVibrateToggle(enabled: Boolean) {
+        settings.setChargeLimitVibrate(enabled)
+        _uiState.update { it.copy(chargeLimitVibrate = enabled) }
     }
 
     /** Live-updates the data-quota slider value without persisting; 0 switches it off. */
