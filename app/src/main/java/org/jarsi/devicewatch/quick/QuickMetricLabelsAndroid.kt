@@ -14,9 +14,9 @@ internal fun quickMetricNameRes(metric: QuickMetric): Triple<Int, Int, Int> = wh
     QuickMetric.CPU_TEMP -> Triple(R.string.quick_cpu_temp_title, R.string.quick_cpu_temp_tile, R.string.quick_cpu_temp_short)
     QuickMetric.DATA_TODAY ->
         Triple(R.string.quick_data_today_title, R.string.quick_data_today_tile, R.string.quick_data_today_short)
-    // 🎯 核心新增：直接复用今日流量的资源，保证不报找不到资源的错
+    // 🎯 彻底独立：指向咱们刚才新建的文字！
     QuickMetric.DATA_MONTH ->
-        Triple(R.string.quick_data_today_title, R.string.quick_data_today_tile, R.string.quick_data_today_short)
+        Triple(R.string.quick_data_month_title, R.string.quick_data_month_tile, R.string.quick_data_month_short)
     QuickMetric.UPTIME -> Triple(R.string.quick_uptime_title, R.string.quick_uptime_tile, R.string.quick_uptime_short)
     QuickMetric.CPU_LOAD -> Triple(R.string.quick_cpu_load_title, R.string.quick_cpu_load_tile, R.string.quick_cpu_load_short)
     QuickMetric.MEMORY -> Triple(R.string.quick_memory_title, R.string.quick_memory_tile, R.string.quick_memory_short)
@@ -32,7 +32,7 @@ internal fun quickMetricIconRes(metric: QuickMetric): Int = when (metric) {
     QuickMetric.BATTERY_TEMP -> R.drawable.ic_quick_battery_temp
     QuickMetric.CPU_TEMP -> R.drawable.ic_quick_cpu_temp
     QuickMetric.DATA_TODAY -> R.drawable.ic_widget_swap
-    // 🎯 核心新增：复用图标
+    // 🎯 如果你有专门的图标，可以换成你自己的，现在暂时借用一下这个
     QuickMetric.DATA_MONTH -> R.drawable.ic_widget_swap
     QuickMetric.UPTIME -> R.drawable.ic_widget_schedule
     QuickMetric.CPU_LOAD -> R.drawable.ic_widget_cpu
