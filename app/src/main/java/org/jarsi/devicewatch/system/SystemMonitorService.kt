@@ -98,8 +98,6 @@ class SystemMonitorService : Service() {
 
     @Volatile private var lastBatteryLevel = -1
 
-    private var chargeLimitState = ChargeLimitLogic.State()
-
     @Volatile private var usageCallback: NetworkStatsManager.UsageCallback? = null
 
     private val serviceJob = SupervisorJob()
@@ -160,21 +158,19 @@ class SystemMonitorService : Service() {
     }
 
     private fun onChargeLimitChanged() {
-        chargeLimitState = ChargeLimitLogic.onLimitChanged(chargeLimitState)
         ChargeLimitNotifier.cancel(applicationContext)
         val level = batteryStatus.currentLevel() ?: return
         evaluateChargeLimit(level, plugged = batteryStatus.isCharging())
     }
 
-    // 🎯 核心大招：废掉所有脑残限制，到了阈值直接干！
+    // 🎯 核心逻辑：简单粗暴，只要插电且达到阈值，就弹！
     private fun evaluateChargeLimit(level: Int, plugged: Boolean) {
         val limit = appSettings.chargeLimitPercent()
-        if (limit <= 0) return
+        if (limit <= 0 || limit >= 100) return
         
         if (plugged && level >= limit) {
             val playSound = appSettings.chargeLimitPlaySound()
             val vibrate = appSettings.chargeLimitVibrate()
-            // 强制弹窗！不管它是不是已经弹过！
             ChargeLimitNotifier.show(applicationContext, level.coerceIn(0, 100), playSound, vibrate)
         }
     }
@@ -367,16 +363,11 @@ class SystemMonitorService : Service() {
                         chargeAnchorStore.save(
                             ChargeAnchorLogic.onPowerConnected(chargeAnchorStore.load())
                         )
-                        // 🎯 强行建通道：一插上电就弹一次，确保能在系统里看到它！
-                        ChargeLimitNotifier.show(
-                            applicationContext, 
-                            lastBatteryLevel.coerceIn(0, 100), 
-                            appSettings.chargeLimitPlaySound(), 
-                            appSettings.chargeLimitVibrate()
-                        )
+                        // 🎯 插电时立刻检查一次，如果已经高于阈值，立刻响
+                        evaluateChargeLimit(lastBatteryLevel, plugged = true)
                     }
                     Intent.ACTION_POWER_DISCONNECTED -> {
-                        chargeLimitState = ChargeLimitLogic.onPowerDisconnected(chargeLimitState)
+                        // 🎯 拔掉充电器，立刻取消通知！这样下次再插上，到了85%还会重新响！
                         ChargeLimitNotifier.cancel(applicationContext)
                         chargeAnchorStore.save(
                             ChargeAnchorLogic.onPowerDisconnected(
