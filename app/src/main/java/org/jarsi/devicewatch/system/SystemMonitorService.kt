@@ -67,7 +67,7 @@ class SystemMonitorService : Service() {
     @Inject lateinit var alertNotifications: AlertNotifications
     private val alertController by lazy { HealthAlertController(appSettings, alertNotifications) }
     @Inject lateinit var batteryStatus: BatteryStatusReader
-    @Inject lateinit var chargeStartScreensaver: ChargeStartScreensaver // 虽然不调用它了，但留着注入防止崩溃
+    @Inject lateinit var chargeStartScreensaver: ChargeStartScreensaver
     @Inject lateinit var cpuProfiles: CpuProfiles
     @Inject lateinit var quickStats: QuickStatsSource
 
@@ -174,7 +174,12 @@ class SystemMonitorService : Service() {
             isPlugged = plugged,
         )
         if (!decision.notify) return
-        if (ChargeLimitNotifier.show(applicationContext, level.coerceIn(0, 100))) {
+        
+        // 🎯 读取用户开关状态，并传进去
+        val playSound = appSettings.chargeLimitPlaySound()
+        val vibrate = appSettings.chargeLimitVibrate()
+        
+        if (ChargeLimitNotifier.show(applicationContext, level.coerceIn(0, 100), playSound, vibrate)) {
             chargeLimitState = decision.state
         }
     }
@@ -367,15 +372,7 @@ class SystemMonitorService : Service() {
                         chargeAnchorStore.save(
                             ChargeAnchorLogic.onPowerConnected(chargeAnchorStore.load())
                         )
-                        // 🎯 模块一：把这行强制启动屏保的代码给注释掉！让它插电只唤醒不亮屏。
-                        /*
-                        serviceScope.launch(Dispatchers.IO) {
-                            try {
-                                chargeStartScreensaver.onPowerConnected()
-                            } catch (_: RuntimeException) {
-                            }
-                        }
-                        */
+                        // 之前已经把强制亮屏代码删了，这里空的
                     }
                     Intent.ACTION_POWER_DISCONNECTED -> {
                         chargeLimitState = ChargeLimitLogic.onPowerDisconnected(chargeLimitState)
