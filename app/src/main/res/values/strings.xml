@@ -1,9 +1,9 @@
 <resources>
-    <string name="app_name">设备监控</string>
-    <string name="dream_service_name">设备监控</string>
-    <string name="widget_description">主屏幕上的智能电池和系统监控。</string>
-    <string name="compact_widget_label">设备监控 (紧凑版)</string>
-    <string name="compact_widget_description">紧凑的电池和数据使用量小部件。</string>
+    <string name="app_name">流量大王</string>
+    <string name="dream_service_name">流量大王</string>
+    <string name="widget_description">桌面上的智能电池和系统监控小组件。</string>
+    <string name="compact_widget_label">流量大王 (紧凑版)</string>
+    <string name="compact_widget_description">精简的电池和流量使用小组件。</string>
     <string name="fgs_special_use_subtype" translatable="false">System resources and battery status monitoring widget update</string>
 
     <string name="main_title">系统仪表盘</string>
@@ -12,40 +12,40 @@
     <string name="tab_apps">应用</string>
     <string name="tab_device">设备</string>
     <string name="tab_settings">设置</string>
-    <string name="widget_active_message">主屏幕小部件已激活，并由后台服务同步。</string>
-    <string name="widget_not_added_message">尚未将小部件添加到主屏幕。长按主屏幕即可添加。</string>
+    <string name="widget_active_message">主屏幕小组件已激活，并由后台服务同步。</string>
+    <string name="widget_not_added_message">尚未将小组件添加到主屏幕。长按主屏幕即可添加。</string>
     <string name="battery_status_section">电池状态 (实时)</string>
-    <string name="time_remaining">剩余时间</string>
+    <string name="time_remaining">预估可用时间</string>
     <string name="temperature">温度</string>
     <string name="voltage">电压</string>
     <string name="system_resources_section">系统资源</string>
     <string name="ram_title">内存 (RAM)</string>
     <string name="cpu_cores_label">处理器核心</string>
     <string name="uptime_label">运行时间</string>
-    <string name="widget_settings_section">小部件设置</string>
-    <string name="widget_opacity_title">小部件背景不透明度</string>
-    <string name="widget_opacity_description" formatted="false">调整主屏幕小部件的背景不透明度。100% 为完全不透明。</string>
-    <string name="widget_black_background_title">黑色小部件背景</string>
+    <string name="widget_settings_section">小组件设置</string>
+    <string name="widget_opacity_title">小组件背景不透明度</string>
+    <string name="widget_opacity_description" formatted="false">调整主屏幕小组件的背景不透明度。100% 为完全不透明。</string>
+    <string name="widget_black_background_title">黑色小组件背景</string>
     <string name="widget_black_background_description">在两种主题下都使用纯黑色而不是深蓝灰色，以便与黑色背景的组件匹配。</string>
-    <string name="data_counter_section">数据计数器</string>
-    <string name="traffic_section">当前流量</string>
+    <string name="data_counter_section">流量统计</string>
+    <string name="traffic_section">实时网速</string>
     <string name="traffic_down">↓ 下载</string>
     <string name="traffic_up">↑ 上传</string>
-    <string name="traffic_peak">最后一分钟峰值: ↓ %1$s · ↑ %2$s</string>
+    <string name="traffic_peak">近1分钟峰值: ↓ %1$s · ↑ %2$s</string>
     <string name="data_counter_mode_day">每天</string>
     <string name="data_counter_mode_cycle">账单周期</string>
     <string name="data_counter_cycle_start">周期从每月 %1$d 号开始</string>
     <string name="data_counter_description">按自然日或按所选的每月账单周期计算数据使用量。月份长度会自动处理。</string>
-    <string name="data_quota_title">数据配额</string>
+    <string name="data_quota_title">流量上限</string>
     <string name="data_quota_description" formatted="false">设置每个统计周期的套餐数据额度；计数器和小组件将显示对应的使用量，并在达到 80% 和上限时发出警告。</string>
     <string name="data_quota_value">%1$s GB</string>
-    <string name="data_quota_off">无配额</string>
+    <string name="data_quota_off">不限制</string>
     <string name="battery_section_title">电池</string>
     <string name="charge_limit_title">充电提醒</string>
     <string name="charge_limit_description">当充电达到所选电量时通知，以便您提前拔下充电器来保护电池。</string>
     <string name="charge_limit_value">在 %1$d %% 时</string>
 
-    <string name="screen_time_section">今日屏幕时间</string>
+    <string name="screen_time_section">今日亮屏时间</string>
     <string name="screen_time_others">其他</string>
     <string name="data_consumers_section">今日流量排行</string>
     <string name="storage_consumers_section">最大应用</string>
@@ -86,7 +86,7 @@
     <string name="export_usage_csv">导出使用记录 (CSV)</string>
     <string name="export_log_csv">导出通知日志 (CSV)</string>
     <string name="export_report_html">分享报告 (HTML)</string>
-    <string name="report_title">设备监控报告</string>
+    <string name="report_title">流量大王报告</string>
     <string name="report_generated_at">创建于 %1$s</string>
     <string name="report_summary_section">摘要</string>
     <string name="report_summary_screen_time">屏幕时间 / 天</string>
@@ -153,18 +153,18 @@
     <string name="onboarding_next">下一步</string>
     <string name="onboarding_back">上一步</string>
     <string name="onboarding_start">开始</string>
-    <string name="onboarding_welcome_title">欢迎使用设备监控</string>
-    <string name="onboarding_welcome_body">在桌面小部件、应用内和充电屏保上查看电池、使用计数器和网络统计信息——全部直接从您的设备读取，绝不外传。</string>
+    <string name="onboarding_welcome_title">欢迎使用流量大王</string>
+    <string name="onboarding_welcome_body">在桌面小组件、应用内和充电屏保上查看电池、使用计数器和网络统计信息——全部直接从您的设备读取，绝不外传。</string>
     <string name="onboarding_permissions_title">权限</string>
-    <string name="onboarding_permissions_body">设备监控仅读取这些权限允许的内容。即使不授予这些权限，一切功能仍可运行——受影响的只是相关行显示一个破折号。</string>
+    <string name="onboarding_permissions_body">流量大王仅读取这些权限允许的内容。即使不授予这些权限，一切功能仍可运行——受影响的只是相关行显示一个破折号。</string>
     <string name="onboarding_runtime_permissions_label">基本权限</string>
     <string name="onboarding_runtime_permissions_desc">位置和附近设备权限用于显示 Wi-Fi 网络名称，电话权限用于显示移动网络详情，通知权限用于发送电池充满警报。</string>
     <string name="onboarding_grant_permissions">授予权限</string>
     <string name="onboarding_open_settings">打开设置</string>
-    <string name="onboarding_widget_title">桌面小部件</string>
-    <string name="onboarding_widget_body">将“设备监控”小部件添加到主屏幕，即可实时查看电池、内存、CPU、存储和今天的数据使用量。</string>
+    <string name="onboarding_widget_title">桌面小组件</string>
+    <string name="onboarding_widget_body">将“流量大王”小组件添加到主屏幕，即可实时查看电池、内存、CPU、存储和今天的数据使用量。</string>
     <string name="onboarding_screensaver_title">充电屏保</string>
-    <string name="onboarding_screensaver_body">充电时，设备监控可作为屏保运行：大时钟、以瓦特为单位的充电功率、下一个闹钟以及自动夜间调光。在系统屏保设置中开启它。</string>
+    <string name="onboarding_screensaver_body">充电时，流量大王可作为屏保运行：大时钟、以瓦特为单位的充电功率、下一个闹钟以及自动夜间调光。在系统屏保设置中开启它。</string>
     <string name="onboarding_history_title">计数器与历史记录</string>
     <string name="onboarding_history_body">屏幕时间、解锁次数、通知和数据使用量按天或按账单周期统计，并保留过去两个月的每日历史记录以及 Android 保存的每月数据总量。</string>
     <string name="onboarding_done_title">一切就绪！</string>
@@ -177,16 +177,16 @@
     <string name="shizuku_status_requesting">正在等待 Shizuku 授权…</string>
     <string name="shizuku_status_on">正在使用 Shizuku 访问权限。</string>
     <string name="shizuku_status_waiting">Shizuku 未运行。启动后即可恢复读取。</string>
-    <string name="shizuku_status_denied">Shizuku 拒绝了权限。请在 Shizuku 应用中允许“设备监控”并重试。</string>
+    <string name="shizuku_status_denied">Shizuku 拒绝了权限。请在 Shizuku 应用中允许“流量大王”并重试。</string>
     <string name="shizuku_status_not_running">Shizuku 未运行。请安装、启动 Shizuku 并重试。</string>
     <string name="root_mode_title">Root 模式</string>
     <string name="root_mode_description">在已 Root 的手机上，读取 Android 对普通应用隐藏的内容：真实的处理器负载、芯片温度和电池本身的损耗数据。它还会在“设备”选项卡中打开内核页面，包含处理器配置文件。您的 Root 管理器会请求权限。</string>
     <string name="root_status_requesting">正在等待您的 Root 管理器授权…</string>
     <string name="root_status_on">正在使用 Root 访问权限。</string>
-    <string name="root_status_denied">Root 访问被拒绝。请在 Root 管理器中允许“设备监控”并重试。</string>
+    <string name="root_status_denied">Root 访问被拒绝。请在 Root 管理器中允许“流量大王”并重试。</string>
     <string name="root_status_restoring">在关闭 Root 之前，正在恢复手机本身的处理器速度限制…</string>
     <string name="cpu_caps_kept_until_restart">使用 Root 设置的处理器速度限制将持续到手机重启：Root 权限已不在，无法移除它们。</string>
-    <string name="root_status_no_su">未找到 su 命令。手机未 Root，或其 Root 管理器 (KernelSU, APatch) 尚未允许“设备监控”。</string>
+    <string name="root_status_no_su">未找到 su 命令。手机未 Root，或其 Root 管理器 (KernelSU, APatch) 尚未允许“流量大王”。</string>
     <string name="classic_look_title">经典外观</string>
     <string name="classic_look_description">1.6 版本之前的颜色和数字字体：在 Android 12 及更高版本上，颜色会跟随您的壁纸。</string>
     <string name="alert_channel_name">设备警报</string>
@@ -292,7 +292,7 @@
     <string name="privacy_dashboard_button">隐私仪表盘</string>
     <string name="usage_access_needed_title">需要使用情况访问权限</string>
     <string name="usage_access_needed_body">授予使用情况访问权限，以便应用显示屏幕时间、应用数据使用量和最近打开日期。</string>
-    <string name="app_detail_screen_time">今日屏幕时间</string>
+    <string name="app_detail_screen_time">今日亮屏时间</string>
     <string name="app_detail_last_opened">最近打开</string>
     <string name="app_detail_last_background">最近在后台运行</string>
     <string name="app_detail_launches">今日打开次数</string>
@@ -384,7 +384,7 @@
     <string name="dream_vertical_shift_description">屏保每分钟会轻微移动一次，以防屏幕烧屏。开启此项后，它只上下移动，并在水平方向保持居中。</string>
     <string name="dream_device_name_title">显示设备名称</string>
     <string name="dream_start_on_charge_title">开始充电时立即启动</string>
-    <string name="dream_start_on_charge_description">当屏幕关闭时开始充电，即使开启了息屏显示，屏保也会出现：拥有扩展访问权限时立即出现，否则“设备监控”会唤醒屏幕，屏保将在约 10-15 秒后出现。屏幕开启时不会发生任何操作。</string>
+    <string name="dream_start_on_charge_description">当屏幕关闭时开始充电，即使开启了息屏显示，屏保也会出现：拥有扩展访问权限时立即出现，否则“流量大王”会唤醒屏幕，屏保将在约 10-15 秒后出现。屏幕开启时不会发生任何操作。</string>
     <string name="dream_device_name_description">在时钟上方显示手机名称，该名称在 Android 设置的“关于手机”中设置。</string>
     <plurals name="dream_unread_notifications">
         <item quantity="one">%d 条未读通知</item>
@@ -597,7 +597,7 @@
     <string name="audio_kind_line">线路连接</string>
     <string name="power_save_mode">省电模式已开启</string>
     <string name="power_device_idle">当前处于深度休眠 (Doze)</string>
-    <string name="power_battery_optimization_exempt">设备监控已跳过电池优化</string>
+    <string name="power_battery_optimization_exempt">流量大王已跳过电池优化</string>
     <string name="power_other_exempt_apps">其他跳过电池优化的应用</string>
     <string name="exempt_none">无</string>
     <string name="exempt_user_and_system">%1$s + %2$s</string>
@@ -680,9 +680,9 @@
     <string name="thermal_shutdown">正在关机</string>
 
     <string name="monitor_channel_name">系统监控</string>
-    <string name="monitor_channel_description">将实时的系统和电池信息更新到小部件。</string>
-    <string name="monitor_notification_title">设备监控正在运行</string>
-    <string name="monitor_notification_text">监控设备状态并更新小部件。</string>
+    <string name="monitor_channel_description">将实时的系统和电池信息更新到小组件。</string>
+    <string name="monitor_notification_title">流量大王正在运行</string>
+    <string name="monitor_notification_text">监控设备状态并更新小组件。</string>
     <string name="battery_full_channel_name">电池警报</string>
     <string name="battery_full_channel_description">充电和电池状态的通知。</string>
     <string name="battery_full_notification_title">电池已充满</string>
@@ -691,8 +691,8 @@
     <string name="charge_limit_notification_text">充电已达到您的提醒上限——您可以拔下充电器了。</string>
     <string name="data_quota_channel_name">流量使用警报</string>
     <string name="data_quota_channel_description">移动数据使用量接近您设置的配额时的警告。</string>
-    <string name="data_quota_warning_title">已使用 %1$d %% 的数据配额</string>
-    <string name="data_quota_reached_title">数据配额已用完</string>
+    <string name="data_quota_warning_title">已使用 %1$d %% 的流量上限</string>
+    <string name="data_quota_reached_title">流量上限已用完</string>
 
     <string name="widget_tile_battery">电池</string>
     <string name="widget_tile_memory">内存</string>
@@ -856,7 +856,7 @@
         <item quantity="other">%d 个应用</item>
     </plurals>
     <string name="privacy_last">最近 %1$s</string>
-    <string name="privacy_page_note">Android 本身会为其隐私仪表盘保留此记录：哪个应用使用了相机、麦克风或位置，何时使用，使用了多长时间，以及是否被拒绝。设备监控通过扩展访问读取并显示它；此处不会存储、导出或备份任何内容。</string>
+    <string name="privacy_page_note">Android 本身会为其隐私仪表盘保留此记录：哪个应用使用了相机、麦克风或位置，何时使用，使用了多长时间，以及是否被拒绝。流量大王通过扩展访问读取并显示它；此处不会存储、导出或备份任何内容。</string>
     <string name="privacy_no_refusals_note">此 Android 版本不记录被拒绝的尝试：记录中仅包含顺利进行的操作。</string>
     <string name="privacy_minute_note">此 Android 版本将记录精确到分钟：一分钟内的使用计为一次，持续时间为整数分钟。</string>
     <string name="privacy_span">记录自 %1$s 起。能追溯多久由 Android 决定，通常为几天。</string>
@@ -980,7 +980,7 @@
     <string name="system_apps_unchanged">包管理器称已完成，但应用保持原样；可能是对此用户的限制所致</string>
     <string name="system_apps_dismiss_notice">忽略</string>
     <string name="system_app_role_core">Android 核心的一部分；没有它，手机无法启动或工作。</string>
-    <string name="system_app_role_self">设备监控本身。</string>
+    <string name="system_app_role_self">流量大王本身。</string>
     <string name="system_app_role_home_in_use">正在使用的桌面；没有它手机将没有启动器。请先将另一个设置为默认。</string>
     <string name="system_app_role_home">一个桌面。如果它是唯一的一个，手机将失去启动器。</string>
     <string name="system_app_role_keyboard_in_use">正在使用的键盘；没有它什么都打不了。请先切换到另一个键盘。</string>
@@ -1041,23 +1041,23 @@
     <string name="live_notification_description">您选择的数字将显示在监控通知的两行中，与其他通知一起；展开即可查看全部。如果未选择任何项，通知将保持静音并折叠在底部。</string>
     <string name="quick_cpu_temp_setting_description">大多数手机仅在具有扩展访问权限时提供此功能。</string>
     <string name="quick_data_today_setting_description">需要授予使用情况访问权限。</string>
-    <string name="live_notification_blocked">“设备监控”的通知已关闭，因此不显示数字。</string>
+    <string name="live_notification_blocked">“流量大王”的通知已关闭，因此不显示数字。</string>
     <string name="live_notification_allow">允许通知</string>
     <string name="monitor_live_channel_name">实时数据</string>
     <string name="single_widget_label">单一数字</string>
     <string name="quick_tiles_section">快捷设置磁贴</string>
-    <string name="quick_tiles_description">从快捷设置编辑模式（铅笔图标）中添加“设备监控”的磁贴。宽磁贴会显示数字的名称和值。</string>
+    <string name="quick_tiles_description">从快捷设置编辑模式（铅笔图标）中添加“流量大王”的磁贴。宽磁贴会显示数字的名称和值。</string>
     <string name="tile_value_icons_title">数字作为图标</string>
     <string name="tile_value_icons_description">小磁贴只显示其图标，因此数字会绘制在原位置。</string>
     <string name="overlay_card_description">悬浮数据</string>
     <string name="overlay_close">隐藏</string>
-    <string name="overlay_open_app">打开设备监控</string>
+    <string name="overlay_open_app">打开流量大王</string>
     <string name="overlay_tile_label">悬浮数据</string>
     <string name="overlay_tile_needs_permission">需要权限</string>
     <string name="overlay_section">悬浮数据</string>
     <string name="overlay_description">在其他应用上层显示的小卡片，在全屏游戏和视频上方也可见。通过快捷设置中的“悬浮数据”磁贴调出和收起；点击卡片会显示隐藏按钮，长按即可隐藏。</string>
     <string name="overlay_shown_title">显示悬浮数据</string>
-    <string name="overlay_permission_explained">Android 将此权限称为“显示在其他应用上层”。设备监控仅用它来绘制此卡片。</string>
+    <string name="overlay_permission_explained">Android 将此权限称为“显示在其他应用上层”。流量大王仅用它来绘制此卡片。</string>
     <string name="overlay_grant">允许</string>
     <string name="overlay_max_figures">最多三个数字</string>
     <string name="overlay_tile_hint">从快捷设置编辑模式中添加“悬浮数据”磁贴。</string>
