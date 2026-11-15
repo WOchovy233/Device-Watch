@@ -85,8 +85,8 @@ internal fun SettingsTab(
     onCommitDataQuota: () -> Unit,
     onChargeLimitChange: (Int) -> Unit,
     onCommitChargeLimit: () -> Unit,
-    onChargeLimitSoundToggle: (Boolean) -> Unit, // 🎯 新增参数
-    onChargeLimitVibrateToggle: (Boolean) -> Unit, // 🎯 新增参数
+    onChargeLimitSoundToggle: (Boolean) -> Unit,
+    onChargeLimitVibrateToggle: (Boolean) -> Unit,
     onClassicLookChange: (Boolean) -> Unit,
     onRootModeChange: (Boolean) -> Unit,
     onShizukuModeChange: (Boolean) -> Unit,
@@ -288,7 +288,6 @@ internal fun SettingsTab(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                // 🎯 新增：声音和震动开关
                 Spacer(modifier = Modifier.height(12.dp))
                 SettingsToggleRow(
                     titleRes = R.string.charge_limit_sound_title,
@@ -336,7 +335,7 @@ internal fun SettingsTab(
             )
         }
 
-        // Figures in the monitor's notification (GitHub #7), none by default
+        // Figures in the monitor's notification
         SettingsSectionCard(titleRes = R.string.live_notification_section) {
             Text(
                 text = stringResource(R.string.live_notification_description),
@@ -354,22 +353,50 @@ internal fun SettingsTab(
                     Text(stringResource(R.string.live_notification_allow))
                 }
             }
+            
+            // 🎯 核心修改：单独处理流量指标，强制改名
             QuickMetric.entries.forEach { metric ->
                 Spacer(modifier = Modifier.height(12.dp))
-                SettingsToggleRow(
-                    titleRes = quickMetricTitleRes(metric),
-                    descriptionRes = when (metric) {
-                        QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
-                        QuickMetric.DATA_TODAY -> R.string.quick_data_today_setting_description
-                        else -> null
-                    },
-                    checked = metric in uiState.notificationMetrics,
-                    onCheckedChange = { onNotificationMetricSwitch(metric, it) }
-                )
+                if (metric == QuickMetric.DATA_TODAY) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "当前周期总流量",
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "显示该周期内已用的总流量（请在数据计数器选择计费周期）",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = metric in uiState.notificationMetrics,
+                            onCheckedChange = { onNotificationMetricSwitch(metric, it) }
+                        )
+                    }
+                } else {
+                    SettingsToggleRow(
+                        titleRes = quickMetricTitleRes(metric),
+                        descriptionRes = when (metric) {
+                            QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
+                            else -> null
+                        },
+                        checked = metric in uiState.notificationMetrics,
+                        onCheckedChange = { onNotificationMetricSwitch(metric, it) }
+                    )
+                }
             }
         }
 
-        // Quick Settings tiles (GitHub #7)
+        // Quick Settings tiles
         SettingsSectionCard(titleRes = R.string.quick_tiles_section) {
             Text(
                 text = stringResource(R.string.quick_tiles_description),
@@ -385,7 +412,7 @@ internal fun SettingsTab(
             )
         }
 
-        // The floating card over other apps (GitHub #2)
+        // The floating card over other apps
         SettingsSectionCard(titleRes = R.string.overlay_section) {
             Text(
                 text = stringResource(R.string.overlay_description),
@@ -421,20 +448,49 @@ internal fun SettingsTab(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             val full = uiState.overlayMetrics.size >= OVERLAY_MAX_FIGURES
+            
+            // 🎯 核心修改：悬浮窗设置里也单独处理流量指标，强制改名
             QuickMetric.entries.forEach { metric ->
                 Spacer(modifier = Modifier.height(12.dp))
                 val chosen = metric in uiState.overlayMetrics
-                SettingsToggleRow(
-                    titleRes = quickMetricTitleRes(metric),
-                    descriptionRes = when (metric) {
-                        QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
-                        QuickMetric.DATA_TODAY -> R.string.quick_data_today_setting_description
-                        else -> null
-                    },
-                    checked = chosen,
-                    onCheckedChange = { onOverlayMetricToggle(metric, it) },
-                    enabled = chosen || !full,
-                )
+                if (metric == QuickMetric.DATA_TODAY) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "当前周期总流量",
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "显示该周期内已用的总流量（请在数据计数器选择计费周期）",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = chosen,
+                            onCheckedChange = { onOverlayMetricToggle(metric, it) },
+                            enabled = chosen || !full
+                        )
+                    }
+                } else {
+                    SettingsToggleRow(
+                        titleRes = quickMetricTitleRes(metric),
+                        descriptionRes = when (metric) {
+                            QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
+                            else -> null
+                        },
+                        checked = chosen,
+                        onCheckedChange = { onOverlayMetricToggle(metric, it) },
+                        enabled = chosen || !full,
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(
