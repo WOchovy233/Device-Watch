@@ -1015,6 +1015,9 @@
     <string name="quick_data_today_title">今日流量</string>
     <string name="quick_data_today_tile">今日流量</string>
     <string name="quick_data_today_short">流量</string>
+    <string name="quick_data_month_title">本月流量</string>
+    <string name="quick_data_month_tile">本月流量</string>
+    <string name="quick_data_month_short">本月流量</string>
     <string name="quick_uptime_title">运行时间</string>
     <string name="quick_uptime_tile">运行时间</string>
     <string name="quick_uptime_short">运行</string>
