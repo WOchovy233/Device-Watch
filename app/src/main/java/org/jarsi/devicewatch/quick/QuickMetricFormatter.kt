@@ -12,14 +12,8 @@ import org.jarsi.devicewatch.widget.formatDouble
 import org.jarsi.devicewatch.widget.percentText
 import java.util.Locale
 
-/**
- * A figure's three names: [title] in Settings and the widget's picker, [tileLabel]
- * on a tile and the widget, [shortName] in the notification, where two
- * temperatures or two "x / y GB" figures side by side need a name each.
- */
 data class QuickMetricNames(val title: String, val tileLabel: String, val shortName: String)
 
-/** The localized words [QuickMetricFormatter] needs, so it stays plain Kotlin under test. */
 data class QuickMetricLabels(
     val names: Map<QuickMetric, QuickMetricNames>,
     val dayUnit: String,
@@ -30,15 +24,10 @@ data class QuickMetricLabels(
     val needsExtendedAccess: String,
     val needsUsageAccess: String,
     val notAvailable: String,
-    /** The word beside the battery's power while it charges, and while it runs down. */
     val charging: String,
     val discharging: String,
 )
 
-/**
- * One figure ready to show. A missing figure has [UNAVAILABLE_TEXT] for its value
- * and says why in [unavailableReason].
- */
 data class QuickMetricReading(
     val metric: QuickMetric,
     val value: String,
@@ -48,7 +37,6 @@ data class QuickMetricReading(
     val available: Boolean get() = unavailableReason == null
 }
 
-/** Turns a reading of the device into the figures of GitHub #7, the same on every surface. */
 object QuickMetricFormatter {
 
     fun read(
@@ -132,7 +120,7 @@ object QuickMetricFormatter {
             QuickMetric.BATTERY_TEMP -> stats.batteryTemp.takeIf { it >= 0.0 }?.let { "${Math.round(it)}°" }
             QuickMetric.CPU_TEMP -> stats.cpuTemp.takeIf { it > 0.0 }?.let { "${Math.round(it)}°" }
             QuickMetric.DATA_TODAY -> dataToday?.totalGb?.let(::dataIconText)
-            // 🎯 新增：小图标显示本月流量
+            // 🎯 核心新增：小图标显示本月流量
             QuickMetric.DATA_MONTH -> stats.mobileDataTotalGb.takeIf { it > 0.0 }?.let { dataIconText(it) } 
             QuickMetric.UPTIME -> stats.uptimeMillis.takeIf { it > 0L }?.let { millis ->
                 val hours = millis / 3_600_000L
