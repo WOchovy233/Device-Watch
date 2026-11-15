@@ -67,7 +67,7 @@ class SystemMonitorService : Service() {
     @Inject lateinit var alertNotifications: AlertNotifications
     private val alertController by lazy { HealthAlertController(appSettings, alertNotifications) }
     @Inject lateinit var batteryStatus: BatteryStatusReader
-    @Inject lateinit var chargeStartScreensaver: ChargeStartScreensaver
+    @Inject lateinit var chargeStartScreensaver: ChargeStartScreensaver // 虽然不调用它了，但留着注入防止崩溃
     @Inject lateinit var cpuProfiles: CpuProfiles
     @Inject lateinit var quickStats: QuickStatsSource
 
@@ -83,7 +83,6 @@ class SystemMonitorService : Service() {
         )
     }
 
-    /** The floating card over other apps; fed every reading the widgets get, like the live notification. */
     private val overlay by lazy {
         FloatingFigureController(
             context = this,
@@ -91,23 +90,16 @@ class SystemMonitorService : Service() {
             quickStats = quickStats,
             mainHandler = Handler(Looper.getMainLooper()),
             isScreenOn = { isScreenOn },
-            // Same process: a monitor restarted under the app's own screensaver keeps the card down.
             isDreaming = { MonitorDreamService.isDreaming },
         )
     }
 
     private var lastUsageRefreshMs = 0L
 
-    /** Latest level from BATTERY_CHANGED; POWER_DISCONNECTED carries no battery extras. */
     @Volatile private var lastBatteryLevel = -1
 
-    /**
-     * Charge-reminder latch. In-memory on purpose: only a service restart in the
-     * middle of a charge can lose it, and the worst case is one repeated reminder.
-     */
     private var chargeLimitState = ChargeLimitLogic.State()
 
-    /** The data-usage watch armed for the next quota alert, if any (see [armUsageCallback]). */
     @Volatile private var usageCallback: NetworkStatsManager.UsageCallback? = null
 
     private val serviceJob = SupervisorJob()
@@ -124,9 +116,6 @@ class SystemMonitorService : Service() {
         registerBatteryTracker()
         registerScreenTracker()
         registerConfigurationTracker()
-        // START_STICKY can recreate the service while the screen is already off, and
-        // SCREEN_ON/OFF are not sticky broadcasts — an assumed-true default would
-        // keep the 5 s loop polling until the next real screen event.
         isScreenOn = (getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isInteractive ?: true
         if (isScreenOn) startUpdateLoop()
     }
@@ -142,10 +131,6 @@ class SystemMonitorService : Service() {
         return START_STICKY
     }
 
-    /**
-     * Settings or the tile just switched the card, or changed its figures: it is
-     * brought in step with the last reading at once, and a fresh reading follows.
-     */
     private fun onOverlayChanged() {
         serviceScope.launch {
             try {
@@ -159,12 +144,6 @@ class SystemMonitorService : Service() {
         }
     }
 
-    /**
-     * Settings just changed the data quota. A fresh reading under the new quota
-     * re-runs the check at once, which re-arms (or releases) the usage watch for
-     * the new thresholds instead of leaving it on the old quota's until the next
-     * screen-on check — possibly hours away with the screen off.
-     */
     private fun onDataQuotaChanged() {
         onDataSettingsChanged(applicationContext) {
             serviceScope.launch {
@@ -174,24 +153,12 @@ class SystemMonitorService : Service() {
         }
     }
 
-    /**
-     * Settings just changed the figures the notification shows: none puts the
-     * silent notification back at once, some post them at once with a fresh
-     * reading, whatever a swipe held back.
-     */
     private fun onNotificationMetricsChanged() {
         serviceScope.launch {
             if (live.onSelectionChanged()) updateWidgetStats(applicationContext)
         }
     }
 
-    /**
-     * Settings just changed the charge limit. The latch belongs to the old limit,
-     * so it is cleared, the reminder on screen (if any) advised on the old limit,
-     * so it is withdrawn, and the new limit is checked against the sticky battery
-     * state right away rather than at the next broadcast — a phone sitting full on
-     * the charger may not send one for hours.
-     */
     private fun onChargeLimitChanged() {
         chargeLimitState = ChargeLimitLogic.onLimitChanged(chargeLimitState)
         ChargeLimitNotifier.cancel(applicationContext)
@@ -199,14 +166,7 @@ class SystemMonitorService : Service() {
         evaluateChargeLimit(level, plugged = batteryStatus.isCharging())
     }
 
-    /**
-     * Runs the reminder rule against one battery reading. The once-per-plug latch is
-     * set only after the notification was actually posted: a reminder the system
-     * refused (notifications not permitted) must be tried again next time.
-     */
     private fun evaluateChargeLimit(level: Int, plugged: Boolean) {
-        // The limit is re-read on every call because settings can change while the
-        // service runs; SharedPreferences is memory-cached, so this stays cheap.
         val decision = ChargeLimitLogic.onBatteryChanged(
             chargeLimitState,
             limitPercent = appSettings.chargeLimitPercent(),
@@ -214,8 +174,6 @@ class SystemMonitorService : Service() {
             isPlugged = plugged,
         )
         if (!decision.notify) return
-        // Same quirky-EXTRA_SCALE clamp as the battery sample, so the notification
-        // can never claim more than 100 %.
         if (ChargeLimitNotifier.show(applicationContext, level.coerceIn(0, 100))) {
             chargeLimitState = decision.state
         }
@@ -244,7 +202,6 @@ class SystemMonitorService : Service() {
                 when (intent.action) {
                     Intent.ACTION_SCREEN_ON -> {
                         isScreenOn = true
-                        // A live notification swiped away comes back with the screen.
                         live.onScreenOn()
                         overlay.onScreenChanged(true)
                         startUpdateLoop()
@@ -252,11 +209,8 @@ class SystemMonitorService : Service() {
                     Intent.ACTION_SCREEN_OFF -> {
                         isScreenOn = false
                         stopUpdateLoop()
-                        // The card comes down with the screen and back with the next reading.
                         overlay.onScreenChanged(false)
                     }
-                    // A screensaver keeps the device interactive, so these are the card's only
-                    // word that it is running; nothing of the app's may sit on the screensaver.
                     Intent.ACTION_DREAMING_STARTED -> overlay.onDreamingChanged(true)
                     Intent.ACTION_DREAMING_STOPPED -> {
                         overlay.onDreamingChanged(false)
@@ -278,7 +232,6 @@ class SystemMonitorService : Service() {
         configurationReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-                    // The card is re-placed for the new orientation by the reading that follows.
                     overlay.onConfigurationChanged()
                     serviceScope.launch {
                         updateWidgetStats(context)
@@ -302,12 +255,6 @@ class SystemMonitorService : Service() {
         }
     }
 
-    /**
-     * Holds the processor profile chosen on the Kernel page: Android's power HAL
-     * can put its own value back now and then, and this pass sets the limit
-     * again. Only here, in the screen-on loop: nothing runs as root while the
-     * screen is off. Without root, or with nothing held, it reads no shell.
-     */
     private suspend fun enforceCpuProfile() {
         try {
             cpuProfiles.enforce()
@@ -318,17 +265,10 @@ class SystemMonitorService : Service() {
         }
     }
 
-    /**
-     * Records today's screen time, unlock count and screen-on time, pushes the screen-time text to the
-     * widget and checks the data quota against [stats] (the reading the widget was just
-     * updated with; null when that read failed). Throttled to about once a minute: it
-     * needs a usage-events pass, which must never run at the 5-second stats cadence.
-     */
     private suspend fun maybeRefreshUsage(stats: SystemStats?) {
         val now = SystemClock.elapsedRealtime()
         if (lastUsageRefreshMs != 0L && now - lastUsageRefreshMs < USAGE_REFRESH_INTERVAL_MS) return
         lastUsageRefreshMs = now
-        // Before the usage-events pass, which bails out without usage access.
         if (stats != null) {
             maybeNotifyDataQuota(stats)
             storageUsedBytes(stats.usedStorageGb)?.let {
@@ -362,7 +302,6 @@ class SystemMonitorService : Service() {
         val notification = if (appSettings.notificationMetrics().isEmpty()) {
             notifications.quiet()
         } else {
-            // The figures follow with the first reading.
             notifications.live(null)
         }
         startForegroundWith(notification)
@@ -380,14 +319,6 @@ class SystemMonitorService : Service() {
         }
     }
 
-    /**
-     * The silent notification could not replace the live one: its channel is
-     * blocked, and a post to a blocked channel leaves the old notification up. Only
-     * the service itself can take its own notification down, so it drops it and
-     * goes foreground again with the silent one, which the blocked channel keeps
-     * out of sight. Runs on a change in Settings, with the app in front, where
-     * going foreground is allowed.
-     */
     private fun replaceWithSilentForeground() {
         try {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -400,10 +331,6 @@ class SystemMonitorService : Service() {
     private fun registerBatteryTracker() {
         batteryReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                // Charger-connection tally and the "since charge" anchor live here
-                // because this runtime receiver is reliable; manifest-registered
-                // POWER_CONNECTED is an implicit broadcast that modern Android does
-                // not deliver.
                 when (intent.action) {
                     Intent.ACTION_BATTERY_CHANGED -> {
                         val level = batteryPercent(intent)
@@ -419,18 +346,11 @@ class SystemMonitorService : Service() {
                                 nowMillis = System.currentTimeMillis(),
                             )
                         )
-                        // The store decides itself which samples are worth appending, but
-                        // every call still hits the filesystem (mkdirs + a retention pass
-                        // over the day files), so it runs off the main thread. The sample
-                        // is timestamped here, at delivery. A quirky EXTRA_SCALE can push
-                        // the percentage past 100, which the store's read path would later
-                        // drop as corruption, so clamp it too.
                         if (level >= 0) {
                             val sample = BatterySample(
                                 timeMillis = System.currentTimeMillis(),
                                 level = level.coerceIn(0, 100),
                                 charging = plugged,
-                                // Tenths of a degree; kept for the charge history's peak.
                                 temperatureDeciC = intent
                                     .getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
                                     .takeIf { it != Int.MIN_VALUE },
@@ -447,18 +367,18 @@ class SystemMonitorService : Service() {
                         chargeAnchorStore.save(
                             ChargeAnchorLogic.onPowerConnected(chargeAnchorStore.load())
                         )
+                        // 🎯 模块一：把这行强制启动屏保的代码给注释掉！让它插电只唤醒不亮屏。
+                        /*
                         serviceScope.launch(Dispatchers.IO) {
-                            // A convenience must never take the monitor down with it.
                             try {
                                 chargeStartScreensaver.onPowerConnected()
                             } catch (_: RuntimeException) {
                             }
                         }
+                        */
                     }
                     Intent.ACTION_POWER_DISCONNECTED -> {
                         chargeLimitState = ChargeLimitLogic.onPowerDisconnected(chargeLimitState)
-                        // The reminder tells the user to unplug; once they have, it
-                        // is stale advice sitting in the shade.
                         ChargeLimitNotifier.cancel(applicationContext)
                         chargeAnchorStore.save(
                             ChargeAnchorLogic.onPowerDisconnected(
@@ -471,10 +391,6 @@ class SystemMonitorService : Service() {
                 }
                 serviceScope.launch {
                     val stats = updateWidgetStats(context)
-                    // The 5 s loop stops with the screen (a measured battery saving),
-                    // so a quota crossed overnight would otherwise wait for the
-                    // morning. Battery broadcasts keep arriving with the screen off
-                    // and already pay for this stats read, so the check rides along.
                     if (stats != null) maybeNotifyDataQuota(stats)
                 }
             }
@@ -488,7 +404,6 @@ class SystemMonitorService : Service() {
         registerReceiver(batteryReceiver, filter)
     }
 
-    /** Pushes a fresh reading to the widgets and returns it; null when the read failed. */
     private suspend fun updateWidgetStats(context: Context): SystemStats? {
         return try {
             val stats = repository.getStats()
@@ -504,28 +419,16 @@ class SystemMonitorService : Service() {
         }
     }
 
-    /**
-     * Puts [stats] into the live notification when figures are chosen for it. It
-     * rides on every reading the widgets get — the 5 s loop with the screen on and
-     * the battery broadcasts — and adds no polling of its own. Today's data is read
-     * only when it is one of the figures.
-     */
     private suspend fun refreshLiveNotification(stats: SystemStats) {
         try {
             live.refresh(stats)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // The figures are a convenience; the monitor must not stop over them.
             e.printStackTrace()
         }
     }
 
-    /**
-     * Puts [stats] on the floating card when it is on. Like the live notification
-     * it rides on every reading and adds no polling; a card the system refuses is
-     * turned off inside the controller, and nothing here may stop the monitor.
-     */
     private suspend fun refreshOverlay(stats: SystemStats) {
         try {
             overlay.refresh(stats)
@@ -536,7 +439,6 @@ class SystemMonitorService : Service() {
         }
     }
 
-    /** The [chosen] figures of [stats] as the notification's two lines. */
     private suspend fun liveText(chosen: Set<QuickMetric>, stats: SystemStats): LiveNotificationText? {
         val dataToday = if (QuickMetric.DATA_TODAY in chosen) quickStats.dataToday() else null
         val labels = quickMetricLabels(applicationContext)
@@ -546,21 +448,9 @@ class SystemMonitorService : Service() {
         return liveNotificationText(readings, labels)
     }
 
-    /**
-     * Data-quota alerts: 80 % and the limit itself, each at most once per counting
-     * period. The latch stays on this device and is keyed by the period start and the
-     * quota, so a new day (or billing cycle) re-arms both, a latch written just after
-     * the user changed the quota belongs to the old quota only — and a quota switched
-     * on mid-period only alerts for what the period has actually used. Synchronized because the
-     * screen-on loop and the battery receiver both call it from the service scope,
-     * and the latch is read before it is written.
-     */
     @Synchronized
     private fun maybeNotifyDataQuota(stats: SystemStats) {
         try {
-            // mobileDataTotalGb carries the quota only when one is set AND the
-            // period figure is available (usage access granted) — the since-boot
-            // fallback must never be compared against a period quota.
             val quotaGb = stats.mobileDataTotalGb
             val action = DataQuotaLogic.classifyReading(
                 reading = QuotaSettingsStamp(quotaGb, stats.dataSettingsGeneration),
@@ -571,14 +461,9 @@ class SystemMonitorService : Service() {
                     disarmUsageCallback()
                     return
                 }
-                // The quota or its period changed under this reading: a fresh
-                // reading under the new settings follows from onDataQuotaChanged.
                 QuotaReadingAction.IGNORE -> return
                 QuotaReadingAction.CHECK -> Unit
             }
-            // The period comes with the reading. Computed here instead, a read that
-            // started before midnight and landed after it would latch the new
-            // period on the old period's usage.
             val periodStartEpochDay = stats.dataPeriodStartEpochDay
             val pending = DataQuotaLogic.pendingThresholds(
                 quotaGb = quotaGb,
@@ -587,7 +472,6 @@ class SystemMonitorService : Service() {
                 notified100 = appSettings.dataQuotaNotified(periodStartEpochDay, quotaGb, DataQuotaLogic.REACHED_PERCENT),
             )
             pending.forEach { threshold ->
-                // Latched only once the alert was really posted; a refused one is retried.
                 val shown = DataQuotaNotifier.show(
                     applicationContext, threshold, stats.mobileDataUsedGb, quotaGb
                 )
@@ -602,21 +486,10 @@ class SystemMonitorService : Service() {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // A quota alert is never worth taking the monitor service down.
             e.printStackTrace()
         }
     }
 
-    /**
-     * Has the system watch the mobile counter for the next alert that is still due,
-     * so a crossing with the screen off — and no battery broadcast to ride on —
-     * alerts all the same. The system calls back once the registered number of
-     * bytes has passed since registration, so the threshold is "bytes left to the
-     * next check" ([DataQuotaLogic.bytesToNextCheck]) and is re-armed after every
-     * check; it stays armed after the period's last alert, so the next period's
-     * first crossing is caught too. No polling is added: the screen-off loop stays
-     * stopped. Only called under [maybeNotifyDataQuota]'s lock.
-     */
     private fun armUsageCallback(
         quotaGb: Double,
         usedGb: Double,
@@ -636,7 +509,7 @@ class SystemMonitorService : Service() {
             }
         }
         try {
-            @Suppress("DEPRECATION") // the network-type overload is the public one
+            @Suppress("DEPRECATION")
             manager.registerUsageCallback(
                 ConnectivityManager.TYPE_MOBILE,
                 null,
@@ -646,8 +519,6 @@ class SystemMonitorService : Service() {
             )
             usageCallback = callback
         } catch (e: Exception) {
-            // No usage access, or the system refused: the screen-on loop and the
-            // battery broadcasts still carry the check.
             e.printStackTrace()
         }
     }
@@ -658,11 +529,9 @@ class SystemMonitorService : Service() {
         try {
             getSystemService(NetworkStatsManager::class.java)?.unregisterUsageCallback(callback)
         } catch (_: Exception) {
-            // Already gone; nothing to release.
         }
     }
 
-    /** Hot-battery and fast-drain alerts from the sample just stored; both off unless switched on. */
     private fun evaluateBatteryAlerts(sample: BatterySample) {
         try {
             applyAlertStep(HealthAlert.HOT_BATTERY, { latched -> AlertLogic.hotBattery(sample.temperatureDeciC, latched) }) {
@@ -712,10 +581,6 @@ class SystemMonitorService : Service() {
     private fun applyAlertStep(alert: HealthAlert, step: (latched: Boolean) -> AlertStep, post: () -> Boolean) =
         alertController.apply(alert, step, post)
 
-    /**
-     * A battery sample is never worth a crash: the store touches the filesystem, and
-     * a full disk would otherwise take the service down on every battery broadcast.
-     */
     private fun recordBatterySample(sample: BatterySample) {
         try {
             batteryHistory.record(sample)
@@ -734,17 +599,14 @@ class SystemMonitorService : Service() {
     }
 
     companion object {
-        /** More than the drain window, so the window's first sample is always in the read. */
         private const val DRAIN_LOOKBACK_MS = 61L * 60 * 1000
         private const val NOTIFICATION_ID = 1001
         private const val USAGE_REFRESH_INTERVAL_MS = 60_000L
 
-        /** Start-command actions from [IntentMonitorServiceRelay]: re-check a changed setting now. */
         const val ACTION_CHARGE_LIMIT_CHANGED = "org.jarsi.devicewatch.action.CHARGE_LIMIT_CHANGED"
         const val ACTION_DATA_QUOTA_CHANGED = "org.jarsi.devicewatch.action.DATA_QUOTA_CHANGED"
         const val ACTION_NOTIFICATION_METRICS_CHANGED = "org.jarsi.devicewatch.action.NOTIFICATION_METRICS_CHANGED"
         const val ACTION_OVERLAY_CHANGED = "org.jarsi.devicewatch.action.OVERLAY_CHANGED"
-        /** From the live notification's delete intent: the user swiped it away. */
         const val ACTION_LIVE_NOTIFICATION_DISMISSED = "org.jarsi.devicewatch.action.LIVE_NOTIFICATION_DISMISSED"
     }
 }
