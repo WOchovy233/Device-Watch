@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close // 🎯 新增图标导入
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -31,6 +32,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton // 🎯 新增
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -59,17 +61,13 @@ import org.jarsi.devicewatch.presentation.PeriodComparison
 import org.jarsi.devicewatch.ui.theme.STATUS_TINT_ALPHA
 import org.jarsi.devicewatch.widget.mobileDataText
 
-/**
- * Overview tab: widget status, live battery ring, usage counters for the selected
- * period, full widget-parity system resources and the data counters — so the app
- * shows everything the home-screen widget does, for people who skip the widget.
- */
 @Composable
 internal fun OverviewTab(
     uiState: DashboardUiState,
     onRefresh: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenSinceCharge: () -> Unit,
+    onHideWidgetHint: () -> Unit, // 🎯 新增：关闭提示的回调
 ) {
     val context = LocalContext.current
     val currentStats = uiState.stats ?: return
@@ -80,39 +78,46 @@ internal fun OverviewTab(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Widget connection status. The card is tinted with the same status color
-        // as its dot — a missing widget is a hint, not an error, and an error-red
-        // card next to an amber dot said two different things.
-        val statusColor = if (uiState.isWidgetInstalled) statusOkColor() else statusWarnColor()
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(statusColor.copy(alpha = STATUS_TINT_ALPHA))
-                    .padding(horizontal = BAND_INSET, vertical = BAND_SPACING)
-            ) {
-                Box(
+        // 🎯 模块四：如果用户点过关闭，或者已经安装了小组件，就不显示这个“牛皮癣”
+        if (!uiState.hideWidgetHint) {
+            val statusColor = if (uiState.isWidgetInstalled) statusOkColor() else statusWarnColor()
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
                     modifier = Modifier
-                        .size(10.dp)
-                        // Sits on the first line's baseline: centring it drifts to
-                        // the middle of the message once the text wraps.
-                        .alignBy { it.measuredHeight }
-                        .clip(CircleShape)
-                        .background(statusColor)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    modifier = Modifier.alignByBaseline(),
-                    text = if (uiState.isWidgetInstalled) {
-                        stringResource(R.string.widget_active_message)
-                    } else {
-                        stringResource(R.string.widget_not_added_message)
-                    },
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                        .fillMaxWidth()
+                        .background(statusColor.copy(alpha = STATUS_TINT_ALPHA))
+                        .padding(start = BAND_INSET, end = 8.dp, top = BAND_SPACING, bottom = BAND_SPACING),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(statusColor)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        modifier = Modifier.weight(1f),
+                        text = if (uiState.isWidgetInstalled) {
+                            stringResource(R.string.widget_active_message)
+                        } else {
+                            stringResource(R.string.widget_not_added_message)
+                        },
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    // 🎯 新增：X 关闭按钮
+                    IconButton(onClick = withTapHaptic(onHideWidgetHint)) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "关闭提示",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         }
 
         // Battery section — the whole card opens the "since charge" page.
@@ -127,8 +132,6 @@ internal fun OverviewTab(
                 )
             }
         ) {
-
-            // One colour for the ring and the status dot: they say the same thing.
             val batteryColor = if (currentStats.batteryLevel > 20) {
                 statusOkColor()
             } else {
@@ -167,9 +170,6 @@ internal fun OverviewTab(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Spacer(modifier = Modifier.height(12.dp))
 
-            // A two-column grid: the values that only appear in some states (the
-            // power source, the system's estimate) fill the next cell instead of
-            // squeezing a single row, and the columns stay aligned.
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 maxItemsInEachRow = 2,
@@ -208,7 +208,6 @@ internal fun OverviewTab(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                // Only while plugged in: on battery there is no source to name.
                 chargeSourceRes(currentStats.chargeSource)?.let { sourceRes ->
                     StackedMetricRow(
                         label = stringResource(R.string.charge_source_label),
@@ -217,8 +216,6 @@ internal fun OverviewTab(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                // How the phone charges (adaptive, held for battery life, paused by
-                // temperature) matters only while plugged in.
                 if (currentStats.chargeSource != ChargeSource.NONE) {
                     chargingStateRes(currentStats.chargingState)?.let { stateRes ->
                         StackedMetricRow(
@@ -236,9 +233,6 @@ internal fun OverviewTab(
             }
         }
 
-        // Usage counters for the selected period, right under the battery so they
-        // are visible without scrolling to the bottom. The whole card opens the
-        // Historia page (daily history values + notification log).
         SettingsSectionCard(
             titleRes = if (uiState.dataCounterMode == DataCounterMode.DAY) {
                 R.string.usage_counters_section
@@ -262,8 +256,6 @@ internal fun OverviewTab(
                         UNAVAILABLE_TEXT
                     }
                 )
-                // The display itself, not app use: time on the lock screen or
-                // the home screen counts here but not in screen time.
                 if (uiState.screenOnTrackingSupported) {
                     StackedMetricRow(
                         label = stringResource(R.string.screen_on_label),
@@ -331,9 +323,6 @@ internal fun OverviewTab(
                     label = stringResource(R.string.charge_count_label),
                     value = uiState.chargeCount.toString()
                 )
-                // "Previous period vs now": a row needs a metric this device can
-                // count and a previous window the store actually observed (null
-                // otherwise); the section hides when no row is left.
                 uiState.periodComparison?.let { comparison ->
                     val screenPrev = comparison.screenTimePrevMillis
                         ?.takeIf { uiState.screenTimeMillis >= 0L }
@@ -390,8 +379,6 @@ internal fun OverviewTab(
                     Text(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        // Day mode really is "yesterday"; in cycle mode a one-day
-                        // window is the previous cycle's first day, not yesterday.
                         text = if (uiState.dataCounterMode == DataCounterMode.DAY) {
                             stringResource(R.string.comparison_yesterday)
                         } else {
@@ -408,8 +395,6 @@ internal fun OverviewTab(
             }
         }
 
-        // Data counters for the selected period (day or billing cycle), right under the
-        // usage card so both period counters sit together.
         SettingsSectionCard(titleRes = R.string.data_counter_section) {
             StackedMetricRow(
                 label = stringResource(wifiDataLabelRes(uiState.dataCounterMode)),
@@ -418,8 +403,6 @@ internal fun OverviewTab(
             uiState.dataBreakdown?.wifi?.let { DataSplitCaption(it) }
             val mobileLabel = stringResource(simDataLabelRes(uiState.dataCounterMode))
             val simName = currentStats.dataSimName.takeIf { it != UNAVAILABLE_TEXT }
-            // With a quota set the row reads "used / quota" (same text the widget shows)
-            // and gets a usage bar; without one it stays a plain amount.
             StackedMetricRow(
                 label = if (simName != null) {
                     stringResource(R.string.label_with_sim, mobileLabel, simName)
@@ -457,11 +440,9 @@ internal fun OverviewTab(
 
         LiveTrafficSection()
 
-        // Resources (RAM, CPU, storage) — widget parity for people without the widget
         SettingsSectionCard(titleRes = R.string.system_resources_section) {
             Spacer(modifier = Modifier.height(4.dp))
 
-            // RAM
             StackedMetricRow(
                 label = stringResource(R.string.ram_title),
                 value = "%.1f / %.1f GB (%d%%)".format(
@@ -486,7 +467,6 @@ internal fun OverviewTab(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Spacer(modifier = Modifier.height(16.dp))
 
-            // CPU load (same data the widget's CPU tile shows)
             StackedMetricRow(
                 label = stringResource(R.string.cpu_load_row),
                 value = buildString {
@@ -514,8 +494,6 @@ internal fun OverviewTab(
                 trackColor = MaterialTheme.colorScheme.outlineVariant
             )
 
-            // The graphics processor and the temperatures by part: on most phones
-            // these exist only with Shizuku or root, so the rows appear with them.
             if (currentStats.gpuLoadPercent >= 0) {
                 Spacer(modifier = Modifier.height(12.dp))
                 StackedMetricRow(
@@ -538,8 +516,6 @@ internal fun OverviewTab(
                 )
             }
 
-            // How close the phone is to throttling itself for heat: the level the
-            // system reports and, where available, the share of the threshold.
             thermalLevelRes(currentStats.thermalLevel)?.let { levelRes ->
                 Spacer(modifier = Modifier.height(12.dp))
                 val level = stringResource(levelRes)
@@ -557,8 +533,6 @@ internal fun OverviewTab(
                         MaterialTheme.colorScheme.onSurface
                     }
                 )
-                // Android gives no temperature for the limit, only the share of it:
-                // say what the limit is, in the same caption style as "4 GB free".
                 if (currentStats.thermalHeadroomPercent >= 0) {
                     Text(
                         text = stringResource(R.string.thermal_limit_caption),
@@ -573,7 +547,6 @@ internal fun OverviewTab(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Storage (same data the widget's storage tile shows)
             StackedMetricRow(
                 label = stringResource(R.string.storage_row),
                 value = "%.0f / %.0f GB (%d%%)".format(
@@ -606,7 +579,6 @@ internal fun OverviewTab(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // What the used space holds, the same split as Settings' storage page.
             uiState.storageBreakdown?.let { storage ->
                 Spacer(modifier = Modifier.height(8.dp))
                 FlowRow(
@@ -636,8 +608,6 @@ internal fun OverviewTab(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Spacer(modifier = Modifier.height(16.dp))
 
-            // CPU info & Uptime — two caption-over-value blocks that stack when a
-            // large font stops them fitting side by side.
             LabelValueRow(
                 label = {
                     Column {
@@ -682,8 +652,6 @@ internal fun OverviewTab(
                 }
             )
 
-            // How much of the uptime the phone spent in deep sleep: a phone that
-            // rarely sleeps is a phone something keeps awake.
             if (currentStats.deepSleepText != UNAVAILABLE_TEXT) {
                 Spacer(modifier = Modifier.height(8.dp))
                 StackedMetricRow(
@@ -696,8 +664,6 @@ internal fun OverviewTab(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Sized to its label rather than to the screen: a full-bleed button in a
-        // page of full-bleed bands reads as another band, not as an action.
         Button(
             onClick = withTapHaptic(onRefresh),
             modifier = Modifier.padding(top = 28.dp),
@@ -720,7 +686,6 @@ internal fun OverviewTab(
     }
 }
 
-/** How much of a network's traffic ran with its app in front, in the caption style. */
 @Composable
 private fun DataSplitCaption(split: TrafficSplit) {
     DataCaption(stringResource(R.string.data_split_caption, split.foregroundPercent, split.backgroundPercent))
@@ -739,10 +704,8 @@ private fun DataCaption(text: String) {
 }
 
 private const val GB_BYTES = 1024.0 * 1024.0 * 1024.0
-
 private val STORAGE_PART_SP = 16.sp
 
-/** Label for the system's thermal level; null when the system reports none. */
 private fun thermalLevelRes(level: ThermalLevel): Int? = when (level) {
     ThermalLevel.UNKNOWN -> null
     ThermalLevel.NONE -> R.string.thermal_none
@@ -754,7 +717,6 @@ private fun thermalLevelRes(level: ThermalLevel): Int? = when (level) {
     ThermalLevel.SHUTDOWN -> R.string.thermal_shutdown
 }
 
-/** Label for how the battery is being charged; null when the platform says nothing. */
 private fun chargingStateRes(state: ChargingState): Int? = when (state) {
     ChargingState.UNKNOWN -> null
     ChargingState.NORMAL -> R.string.charging_state_normal
@@ -764,7 +726,6 @@ private fun chargingStateRes(state: ChargingState): Int? = when (state) {
     ChargingState.ADAPTIVE -> R.string.charging_state_adaptive
 }
 
-/** Label for what the phone is plugged into; null on battery. */
 private fun chargeSourceRes(source: ChargeSource): Int? = when (source) {
     ChargeSource.NONE -> null
     ChargeSource.AC -> R.string.charge_source_ac
@@ -792,8 +753,6 @@ private fun ComparisonRow(
             )
         },
         value = {
-            // The two figures and the change belong together: they move to the
-            // next line as one block rather than breaking apart.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     maxLines = 1,
@@ -806,8 +765,6 @@ private fun ComparisonRow(
                 Text(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    // Less is better for all three metrics: growth reads in the error
-                    // color, a drop in the primary one, and no baseline stays neutral.
                     text = changePercent?.let {
                         stringResource(R.string.comparison_change, if (it > 0) "+" else "", it)
                     } ?: UNAVAILABLE_TEXT,
