@@ -85,8 +85,8 @@ internal fun SettingsTab(
     onCommitDataQuota: () -> Unit,
     onChargeLimitChange: (Int) -> Unit,
     onCommitChargeLimit: () -> Unit,
-    onChargeLimitSoundToggle: (Boolean) -> Unit,
-    onChargeLimitVibrateToggle: (Boolean) -> Unit,
+    onChargeLimitSoundToggle: (Boolean) -> Unit, 
+    onChargeLimitVibrateToggle: (Boolean) -> Unit, 
     onClassicLookChange: (Boolean) -> Unit,
     onRootModeChange: (Boolean) -> Unit,
     onShizukuModeChange: (Boolean) -> Unit,
@@ -99,6 +99,9 @@ internal fun SettingsTab(
     onShowIntro: () -> Unit,
 ) {
     val context = LocalContext.current
+    // 🎯 这是一个临时状态，等咱们把底层搞定了，再把它存进数据库里
+    var isMonthDataEnabled by remember { mutableStateOf(false) }
+
     LifecycleResumeEffect(Unit) {
         onOverlayPermissionChecked(Settings.canDrawOverlays(context))
         onPauseOrDispose { }
@@ -354,10 +357,23 @@ internal fun SettingsTab(
                 }
             }
             
-            // 🎯 核心修改：单独处理流量指标，强制改名
             QuickMetric.entries.forEach { metric ->
                 Spacer(modifier = Modifier.height(12.dp))
+                // 🎯 原汁原味的“今日流量”开关
+                SettingsToggleRow(
+                    titleRes = quickMetricTitleRes(metric),
+                    descriptionRes = when (metric) {
+                        QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
+                        QuickMetric.DATA_TODAY -> R.string.quick_data_today_setting_description
+                        else -> null
+                    },
+                    checked = metric in uiState.notificationMetrics,
+                    onCheckedChange = { onNotificationMetricSwitch(metric, it) }
+                )
+
+                // 🎯 核心改变：在原版“今日流量”下面，硬加一个独立的“本月流量” UI
                 if (metric == QuickMetric.DATA_TODAY) {
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -365,33 +381,23 @@ internal fun SettingsTab(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "当前周期总流量",
+                                text = "本月流量",
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "显示该周期内已用的总流量（请在数据计数器选择计费周期）",
+                                text = "显示本月已用和剩余的总流量",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Switch(
-                            checked = metric in uiState.notificationMetrics,
-                            onCheckedChange = { onNotificationMetricSwitch(metric, it) }
+                            checked = isMonthDataEnabled,
+                            onCheckedChange = { isMonthDataEnabled = it }
                         )
                     }
-                } else {
-                    SettingsToggleRow(
-                        titleRes = quickMetricTitleRes(metric),
-                        descriptionRes = when (metric) {
-                            QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
-                            else -> null
-                        },
-                        checked = metric in uiState.notificationMetrics,
-                        onCheckedChange = { onNotificationMetricSwitch(metric, it) }
-                    )
                 }
             }
         }
@@ -449,11 +455,25 @@ internal fun SettingsTab(
             )
             val full = uiState.overlayMetrics.size >= OVERLAY_MAX_FIGURES
             
-            // 🎯 核心修改：悬浮窗设置里也单独处理流量指标，强制改名
             QuickMetric.entries.forEach { metric ->
                 Spacer(modifier = Modifier.height(12.dp))
                 val chosen = metric in uiState.overlayMetrics
+                
+                // 🎯 悬浮窗里也是一样，先显示原版，再加独立的
+                SettingsToggleRow(
+                    titleRes = quickMetricTitleRes(metric),
+                    descriptionRes = when (metric) {
+                        QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
+                        QuickMetric.DATA_TODAY -> R.string.quick_data_today_setting_description
+                        else -> null
+                    },
+                    checked = chosen,
+                    onCheckedChange = { onOverlayMetricToggle(metric, it) },
+                    enabled = chosen || !full,
+                )
+
                 if (metric == QuickMetric.DATA_TODAY) {
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -461,35 +481,24 @@ internal fun SettingsTab(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "当前周期总流量",
+                                text = "本月流量",
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "显示该周期内已用的总流量（请在数据计数器选择计费周期）",
+                                text = "在悬浮窗显示本月已用和剩余的总流量",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Switch(
-                            checked = chosen,
-                            onCheckedChange = { onOverlayMetricToggle(metric, it) },
-                            enabled = chosen || !full
+                            checked = isMonthDataEnabled,
+                            onCheckedChange = { isMonthDataEnabled = it },
+                            enabled = isMonthDataEnabled || !full
                         )
                     }
-                } else {
-                    SettingsToggleRow(
-                        titleRes = quickMetricTitleRes(metric),
-                        descriptionRes = when (metric) {
-                            QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
-                            else -> null
-                        },
-                        checked = chosen,
-                        onCheckedChange = { onOverlayMetricToggle(metric, it) },
-                        enabled = chosen || !full,
-                    )
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
