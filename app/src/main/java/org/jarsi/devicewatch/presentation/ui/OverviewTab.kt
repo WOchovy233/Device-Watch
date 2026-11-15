@@ -2,9 +2,10 @@ package org.jarsi.devicewatch.presentation.ui
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,21 +25,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Close // 🎯 新增图标导入
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton // 🎯 新增
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,9 +48,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.style.TextOverflow
 import org.jarsi.devicewatch.R
 import org.jarsi.devicewatch.data.ChargeSource
 import org.jarsi.devicewatch.data.ChargingState
@@ -61,18 +63,37 @@ import org.jarsi.devicewatch.presentation.DashboardUiState
 import org.jarsi.devicewatch.presentation.PeriodComparison
 import org.jarsi.devicewatch.ui.theme.STATUS_TINT_ALPHA
 import org.jarsi.devicewatch.widget.mobileDataText
+import java.time.LocalDate
 
-@OptIn(ExperimentalLayoutApi::class) // 🎯 修复：FlowRow 是实验性 API，必须加这个注解防报错
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun OverviewTab(
     uiState: DashboardUiState,
     onRefresh: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenSinceCharge: () -> Unit,
-    onHideWidgetHint: () -> Unit, // 🎯 新增：关闭提示的回调
+    onHideWidgetHint: () -> Unit,
 ) {
     val context = LocalContext.current
     val currentStats = uiState.stats ?: return
+
+    // 🎯 用于暂存导出文本内容
+    var exportTextContent by remember { mutableStateOf("") }
+
+    // 🎯 调起系统保存 txt 文件
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    outputStream.write(exportTextContent.toByteArray())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -80,7 +101,6 @@ internal fun OverviewTab(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 🎯 模块四：如果用户点过关闭，或者已经安装了小组件，就不显示这个“牛皮癣”
         if (!uiState.hideWidgetHint) {
             val statusColor = if (uiState.isWidgetInstalled) statusOkColor() else statusWarnColor()
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -108,7 +128,6 @@ internal fun OverviewTab(
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    // 🎯 新增：X 关闭按钮
                     IconButton(onClick = withTapHaptic(onHideWidgetHint)) {
                         Icon(
                             imageVector = Icons.Filled.Close,
@@ -122,7 +141,7 @@ internal fun OverviewTab(
             }
         }
 
-        // Battery section — the whole card opens the "since charge" page.
+        // Battery section
         SettingsSectionCard(
             titleRes = R.string.battery_status_section,
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -134,11 +153,7 @@ internal fun OverviewTab(
                 )
             }
         ) {
-            val batteryColor = if (currentStats.batteryLevel > 20) {
-                statusOkColor()
-            } else {
-                MaterialTheme.colorScheme.error
-            }
+            val batteryColor = if (currentStats.batteryLevel > 20) statusOkColor() else MaterialTheme.colorScheme.error
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(160.dp)
@@ -235,6 +250,7 @@ internal fun OverviewTab(
             }
         }
 
+        // Usage counters
         SettingsSectionCard(
             titleRes = if (uiState.dataCounterMode == DataCounterMode.DAY) {
                 R.string.usage_counters_section
@@ -397,6 +413,7 @@ internal fun OverviewTab(
             }
         }
 
+        // 🎯 流量统计卡片（包含导出功能）
         SettingsSectionCard(titleRes = R.string.data_counter_section) {
             StackedMetricRow(
                 label = stringResource(wifiDataLabelRes(uiState.dataCounterMode)),
@@ -437,6 +454,46 @@ internal fun OverviewTab(
                     },
                     trackColor = MaterialTheme.colorScheme.outlineVariant
                 )
+            }
+
+            // 🎯 导出按钮逻辑
+            Spacer(modifier = Modifier.height(12.dp))
+            TextButton(
+                onClick = withTapHaptic {
+                    val sb = StringBuilder()
+                    sb.append("📱 设备流量全量审计报告\n")
+                    sb.append("导出时间: ${LocalDate.now()}\n")
+                    sb.append("统计周期: ${if (uiState.dataCounterMode == DataCounterMode.DAY) "今日" else "本月（计费周期）"}\n")
+                    sb.append("==============================\n\n")
+                    
+                    // 按流量从大到小排序，全量输出，绝对不截断！
+                    val sortedData = uiState.dataConsumers.sortedByDescending { it.bytes }
+                    var count = 0
+                    
+                    sortedData.forEach { consumer ->
+                        // 只要能读出字节数，大于 0 就记录，连 1 个字节的跑冒滴漏都不放过
+                        if (consumer.bytes > 0) {
+                            val pkgName = consumer.packageName ?: "无包名(系统服务)"
+                            sb.append("📦 应用名称: ${consumer.label}\n")
+                            sb.append("🔗 包名: $pkgName\n")
+                            sb.append("📊 消耗流量: ${bytesText(consumer.bytes)}\n")
+                            sb.append("------------------------------\n")
+                            count++
+                        }
+                    }
+                    
+                    if (count == 0) {
+                        sb.append("暂无任何应用产生流量。\n")
+                    } else {
+                        sb.append("\n共计导出 $count 个应用的数据。\n")
+                    }
+
+                    exportTextContent = sb.toString()
+                    exportLauncher.launch("全量流量审计_${LocalDate.now()}.txt")
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("📥 导出全量流量明细 (TXT)", fontWeight = FontWeight.Bold)
             }
         }
 
