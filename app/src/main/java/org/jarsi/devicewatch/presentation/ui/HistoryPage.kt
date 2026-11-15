@@ -145,6 +145,15 @@ fun HistoryPage(
                                 viewModel.exportNotificationLogCsv(context)
                             }
                         )
+                        // 🎯 咱们自己加的：全量流量导出
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("📄 导出本月全量流量 (TXT)") }, 
+                            onClick = withTapHaptic {
+                                exportMenuOpen = false
+                                viewModel.exportAllTrafficTxt(context)
+                            }
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
