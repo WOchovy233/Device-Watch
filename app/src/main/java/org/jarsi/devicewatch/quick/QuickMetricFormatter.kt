@@ -65,12 +65,10 @@ object QuickMetricFormatter {
             QuickMetric.BATTERY ->
                 if (stats.batteryLevel < 0) missing()
                 else shown(percentText(stats.batteryLevel), stats.batteryStatus.takeIf { it != UNAVAILABLE_TEXT })
-            // Below zero is the shared "unavailable" sentinel for temperatures, as on the widgets.
             QuickMetric.BATTERY_TEMP ->
                 if (stats.batteryTemp < 0.0) missing() else shown(formatDouble(stats.batteryTemp, 1, " °C"))
             QuickMetric.CPU_TEMP -> when {
                 stats.cpuTemp > 0.0 -> shown(formatDouble(stats.cpuTemp, 1, " °C"))
-                // Most phones hand the processor's sensors only to a privileged shell.
                 !extendedAccess -> missing(labels.needsExtendedAccess)
                 else -> missing()
             }
@@ -81,6 +79,24 @@ object QuickMetricFormatter {
                     "${labels.mobileShort} ${compactDataAmountText(dataToday.mobileGb)} · " +
                         "${labels.wifiShort} ${compactDataAmountText(dataToday.wifiGb)}",
                 )
+            // 🎯 核心新增：本月流量的逻辑
+            QuickMetric.DATA_MONTH -> {
+                if (stats.mobileDataUsedGb < 0.0) {
+                    missing(labels.needsUsageAccess)
+                } else {
+                    val used = stats.mobileDataUsedGb
+                    val total = stats.mobileDataTotalGb
+                    if (total > 0.0) {
+                        val remain = (total - used).coerceAtLeast(0.0)
+                        shown(
+                            String.format(Locale.getDefault(), "已用 %.1fG / 总 %.1fG", used, total),
+                            String.format(Locale.getDefault(), "剩余 %.1fG", remain)
+                        )
+                    } else {
+                        shown(String.format(Locale.getDefault(), "已用 %.1fG", used), "未设置上限")
+                    }
+                }
+            }
             QuickMetric.UPTIME ->
                 if (stats.uptimeMillis <= 0L) missing()
                 else shown(uptimeText(stats.uptimeMillis, labels.dayUnit, labels.hourUnit, labels.minuteUnit))
@@ -92,11 +108,9 @@ object QuickMetricFormatter {
             QuickMetric.STORAGE ->
                 if (stats.usedStorageGb < 0.0 || stats.totalStorageGb <= 0.0) missing()
                 else shown(String.format(Locale.getDefault(), "%.0f / %.0f GB", stats.usedStorageGb, stats.totalStorageGb))
-            // Charging or discharging comes from the battery status: the sign of the current differs by maker.
             QuickMetric.BATTERY_POWER -> batteryPowerWattsOf(stats)?.let { watts ->
                 val word = when {
                     stats.batteryCharging -> labels.charging
-                    // Plugged in, not charging (full, or held at a limit): the status says which.
                     heldOnCharger(stats) -> stats.batteryStatus.takeIf { it != UNAVAILABLE_TEXT }
                     else -> labels.discharging
                 }
@@ -105,26 +119,21 @@ object QuickMetricFormatter {
         }
     }
 
-    /** Plugged in but not charging: full, or held at a charge limit. */
     private fun heldOnCharger(stats: SystemStats): Boolean =
         stats.chargeSource != ChargeSource.NONE && !stats.batteryCharging
 
-    /** The battery's power; held on the charger a trickle is read as µA only, never rescaled. */
     private fun batteryPowerWattsOf(stats: SystemStats): Double? =
         if (heldOnCharger(stats)) batteryTricklePowerWatts(stats.batteryCurrentNowRaw, stats.batteryVoltage)
         else batteryPowerWatts(stats.batteryCurrentNowRaw, stats.batteryVoltage, stats.batteryCurrentMicroamps)
 
-    /**
-     * The figure at its shortest, drawn in place of a small tile's icon: a small
-     * tile shows nothing else. Memory and storage become the share in use, data and
-     * uptime keep one unit. Null when the figure cannot be read.
-     */
     fun iconText(metric: QuickMetric, stats: SystemStats, dataToday: DataToday?, labels: QuickMetricLabels): String? =
         when (metric) {
             QuickMetric.BATTERY -> stats.batteryLevel.takeIf { it >= 0 }?.let { "$it%" }
             QuickMetric.BATTERY_TEMP -> stats.batteryTemp.takeIf { it >= 0.0 }?.let { "${Math.round(it)}°" }
             QuickMetric.CPU_TEMP -> stats.cpuTemp.takeIf { it > 0.0 }?.let { "${Math.round(it)}°" }
             QuickMetric.DATA_TODAY -> dataToday?.totalGb?.let(::dataIconText)
+            // 🎯 新增：小图标显示本月流量
+            QuickMetric.DATA_MONTH -> stats.mobileDataTotalGb.takeIf { it > 0.0 }?.let { dataIconText(it) } 
             QuickMetric.UPTIME -> stats.uptimeMillis.takeIf { it > 0L }?.let { millis ->
                 val hours = millis / 3_600_000L
                 when {
@@ -154,7 +163,6 @@ object QuickMetricFormatter {
     private fun sharePercent(used: Double, total: Double): String? =
         if (used < 0.0 || total <= 0.0) null else "${Math.round(used / total * 100.0)}%"
 
-    /** Uptime in its two largest units: "3 pv 4 t", "4 t 12 min", "12 min". */
     fun uptimeText(millis: Long, dayUnit: String, hourUnit: String, minuteUnit: String): String {
         val minutes = millis / 60_000L
         val hours = minutes / 60
