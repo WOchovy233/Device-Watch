@@ -260,8 +260,8 @@ internal fun SettingsTab(
                     value = uiState.dataQuotaGb.toFloat(),
                     onValueChange = { onDataQuotaChange(it.roundToInt().toDouble()) },
                     onValueChangeFinished = withTapHaptic(onCommitDataQuota),
-                    valueRange = DATA_QUOTA_MIN_GB.toFloat()..DATA_QUOTA_SLIDER_MAX_GB.toFloat(),
-                    steps = 98,
+                    valueRange = DATA_QUOTA_MIN_GB.toFloat()..300f,
+                    steps = 298,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
