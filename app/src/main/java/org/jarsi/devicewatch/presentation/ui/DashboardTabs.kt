@@ -67,15 +67,12 @@ import org.jarsi.devicewatch.presentation.ShizukuStatus
 import org.jarsi.devicewatch.presentation.SystemAppsViewModel
 import org.jarsi.devicewatch.system.SystemMonitorService
 
-/** Doubles the selection pill so colour is never the only cue. */
 private val SELECTED_TAB_RULE = 3.dp
 
-/** The dashboard's flat bottom-navigation destinations, in display order. */
 internal enum class DashboardTab(
     @StringRes val labelRes: Int,
     val icon: ImageVector,
 ) {
-    // Declaration order = pager page order; per-tab state is keyed by page index.
     Overview(R.string.tab_overview, Icons.Filled.Home),
     Apps(R.string.tab_apps, Icons.Filled.Apps),
     Device(R.string.tab_device, Icons.Filled.PhoneAndroid),
@@ -90,7 +87,6 @@ fun SystemDashboardScreen(
     kernelViewModel: KernelViewModel = hiltViewModel(),
     privacyViewModel: PrivacyViewModel = hiltViewModel(),
     systemAppsViewModel: SystemAppsViewModel = hiltViewModel(),
-    /** Grows each time a tile, the single-figure widget or the notification asks for the Overview. */
     openOverviewRequest: Int = 0,
 ) {
     val context = LocalContext.current
@@ -98,7 +94,6 @@ fun SystemDashboardScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val appsUiState by appsViewModel.uiState.collectAsStateWithLifecycle()
 
-    // Start the background monitoring service (independent of the notification permission result).
     fun startSystemMonitorService() {
         val serviceIntent = Intent(context, SystemMonitorService::class.java)
         try {
@@ -119,30 +114,22 @@ fun SystemDashboardScreen(
         viewModel.refresh()
     }
 
-    // The pager is the single source of truth for the selected tab: swiping and
-    // the bottom bar both drive it, and each page keeps its own saved scroll state.
     val pagerState = rememberPagerState(pageCount = { DashboardTab.entries.size })
     val selectedTab = DashboardTab.entries[pagerState.currentPage]
     val scope = rememberCoroutineScope()
 
-    // Historia full-screen page, reached from the Overview usage-counters card.
     var showHistory by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = showHistory) { showHistory = false }
 
-    // "Since charge" full-screen page, reached from the Overview battery card.
     var showSinceCharge by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = showSinceCharge) { showSinceCharge = false }
 
-    // Kernel page, reached from the Device tab's KERNEL band; root only, so it
-    // closes the moment root does.
     var showKernel by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = showKernel) { showKernel = false }
     LaunchedEffect(uiState.rootStatus) {
         if (uiState.rootStatus != RootStatus.ON) showKernel = false
     }
 
-    // Privacy log page, reached from the Apps tab's PRIVACY band. It reads through
-    // the shell, so it closes the moment extended access goes off.
     val extendedAccessOn = uiState.rootStatus == RootStatus.ON || uiState.shizukuStatus == ShizukuStatus.ON
     var showPrivacy by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = showPrivacy) { showPrivacy = false }
@@ -150,15 +137,12 @@ fun SystemDashboardScreen(
         if (!extendedAccessOn) showPrivacy = false
     }
 
-    // System apps page, reached from the Apps tab's SYSTEM APPS band. Its removals
-    // go through the shell, so it too closes the moment extended access goes off.
     var showSystemApps by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = showSystemApps) { showSystemApps = false }
     LaunchedEffect(extendedAccessOn) {
         if (!extendedAccessOn) showSystemApps = false
     }
 
-    // Every figure a tile, the widget or the notification shows is on the Overview.
     LaunchedEffect(openOverviewRequest) {
         if (openOverviewRequest > 0) {
             showHistory = false
@@ -170,18 +154,12 @@ fun SystemDashboardScreen(
         }
     }
 
-    // First-run intro state: shown until completed, and replayable from Settings.
     val onboardingCompleted = uiState.onboardingCompleted
     var replayOnboarding by rememberSaveable { mutableStateOf(false) }
-    // Suppresses the auto permission ask only when the intro's permission dialog
-    // was actually launched this session — deliberately NOT saveable, so a
-    // process-death restore falls back to asking.
     var permissionsAskedInIntro by remember { mutableStateOf(false) }
     BackHandler(enabled = replayOnboarding) { replayOnboarding = false }
 
     LaunchedEffect(Unit) {
-        // The monitor service needs no runtime permission — start it regardless of
-        // whether the intro is still open, or nothing collects while it is.
         startSystemMonitorService()
         viewModel.refresh()
         viewModel.loadWidgetAppearance()
@@ -189,9 +167,6 @@ fun SystemDashboardScreen(
         viewModel.loadDeviceInfo()
     }
 
-    // The automatic permission ask waits until the intro is out of the way — its
-    // permission page owns the asking on first run. If the dialog was already
-    // launched from the intro just now, the user made their choices; don't re-ask.
     LaunchedEffect(onboardingCompleted) {
         if (onboardingCompleted == true && !permissionsAskedInIntro) {
             val missingPermissions = missingRuntimePermissions(context)
@@ -250,8 +225,6 @@ fun SystemDashboardScreen(
             TopAppBar(
                 title = {
                     Column {
-                        // The app names itself once, quietly, above the page title —
-                        // the launcher icon is gone the moment the app is open.
                         Text(
                             stringResource(R.string.app_name).uppercase(),
                             fontSize = 12.sp,
@@ -269,8 +242,6 @@ fun SystemDashboardScreen(
                 actions = {
                     IconButton(onClick = withTapHaptic {
                         viewModel.refresh()
-                        // The Apps tab has its own on-demand queries; refresh it too
-                        // when it is the one on screen.
                         if (selectedTab == DashboardTab.Apps) {
                             appsViewModel.refresh()
                         }
@@ -290,11 +261,7 @@ fun SystemDashboardScreen(
             }
         },
         bottomBar = {
-            // The theme root already bounds the font scale for the whole tree
-            // (AppScale.kt), which is what keeps these labels on one line.
             Column {
-                // On the light theme the bar is white on a near-white page:
-                // this rule is the only thing that separates the two.
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 NavigationBar {
                     val indicator = MaterialTheme.colorScheme.primary
@@ -305,9 +272,6 @@ fun SystemDashboardScreen(
                             onClick = withTapHaptic {
                                 scope.launch { pagerState.animateScrollToPage(index) }
                             },
-                            // Selection is never colour alone: the pill is
-                            // doubled by a rule under the item, where the eye
-                            // is already travelling from icon to label.
                             modifier = Modifier.drawBehind {
                                 if (selected) {
                                     val rule = SELECTED_TAB_RULE.toPx()
@@ -333,11 +297,8 @@ fun SystemDashboardScreen(
         }
     ) { paddingValues ->
         if (uiState.stats != null) {
-            // Driven ONLY by the pull-initiated flags — never by generic loading
-            // state, or the spinner would pop on tab switches and the refresh icon.
             val isPullRefreshing = uiState.isRefreshing ||
                 (selectedTab == DashboardTab.Apps && appsUiState.isRefreshing)
-            // One pull-to-refresh wrapper serves all four tabs via nested scroll.
             PullToRefreshBox(
                 isRefreshing = isPullRefreshing,
                 onRefresh = {
@@ -349,7 +310,6 @@ fun SystemDashboardScreen(
                 },
                 modifier = Modifier.fillMaxSize().padding(paddingValues)
             ) {
-                // Swiping between tabs; the pager preserves each page's scroll state.
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
@@ -359,11 +319,11 @@ fun SystemDashboardScreen(
                             uiState = uiState,
                             onRefresh = viewModel::refresh,
                             onOpenHistory = { showHistory = true },
-                            onOpenSinceCharge = { showSinceCharge = true }
+                            onOpenSinceCharge = { showSinceCharge = true },
+                            onHideWidgetHint = viewModel::onHideWidgetHint // 🎯 传过去
                         )
 
                         DashboardTab.Apps -> {
-                            // The band reads the record only with extended access on, and only while shown.
                             val privacy = if (extendedAccessOn) {
                                 privacyViewModel.state.collectAsStateWithLifecycle().value
                             } else {
@@ -379,7 +339,6 @@ fun SystemDashboardScreen(
                         }
 
                         DashboardTab.Device -> {
-                            // The band reads the kernel only on a rooted phone, and only while shown.
                             val kernelBand = if (uiState.rootStatus == RootStatus.ON) {
                                 kernelViewModel.band.collectAsStateWithLifecycle().value
                             } else {
@@ -389,6 +348,7 @@ fun SystemDashboardScreen(
                                 uiState = uiState,
                                 kernelBand = kernelBand,
                                 onOpenKernel = { showKernel = true },
+                                viewModel = viewModel // 🎯 传过去
                             )
                         }
 
@@ -404,7 +364,6 @@ fun SystemDashboardScreen(
                             onCommitDataQuota = viewModel::onCommitDataQuota,
                             onChargeLimitChange = viewModel::onChargeLimitChange,
                             onCommitChargeLimit = viewModel::onCommitChargeLimit,
-                            // 🎯 新增：接上声音和震动开关
                             onChargeLimitSoundToggle = viewModel::onChargeLimitPlaySoundToggle,
                             onChargeLimitVibrateToggle = viewModel::onChargeLimitVibrateToggle,
                             onClassicLookChange = viewModel::onClassicLookChange,
