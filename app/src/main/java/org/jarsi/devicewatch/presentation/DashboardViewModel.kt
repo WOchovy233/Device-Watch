@@ -66,6 +66,7 @@ data class DashboardUiState(
     val deviceInfo: DeviceInfo? = null,
     val isRefreshing: Boolean = false,
     val isWidgetInstalled: Boolean = false,
+    val hideWidgetHint: Boolean = false, // 🎯 新增：控制主页牛皮癣
     val lastUpdated: String = "--:--",
     val widgetOpacity: Float = DEFAULT_WIDGET_OPACITY,
     val widgetBlackBackground: Boolean = false,
@@ -100,8 +101,6 @@ data class DashboardUiState(
     val dataBreakdown: DataBreakdown? = null,
     val storageBreakdown: StorageBreakdown? = null,
     val deviceState: DeviceState? = null,
-    
-    // 🎯 模块三新增：全量免优化白名单
     val exemptAppsList: List<String> = emptyList(),
     val isExemptAppsLoading: Boolean = false
 )
@@ -133,6 +132,7 @@ class DashboardViewModel @Inject constructor(
             it.copy(
                 onboardingCompleted = settings.onboardingShown(),
                 classicLook = settings.classicLook(),
+                hideWidgetHint = settings.hideWidgetHint(), // 🎯 初始化读取
                 rootStatus = if (access == PrivilegedAccess.ROOT) RootStatus.ON else RootStatus.OFF,
                 shizukuStatus = if (access == PrivilegedAccess.SHIZUKU) ShizukuStatus.ON else ShizukuStatus.OFF,
                 enabledAlerts = HealthAlert.entries.filter(settings::alertEnabled).toSet(),
@@ -157,32 +157,22 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch { repository.latestStats.filterNotNull().collect(::publishStats) }
     }
 
-    // 🎯 模块三新增：获取所有免优化应用
+    // 🎯 新增：用户点击关闭
+    fun onHideWidgetHint() {
+        settings.setHideWidgetHint(true)
+        _uiState.update { it.copy(hideWidgetHint = true) }
+    }
+
     fun loadExemptApps() {
         viewModelScope.launch {
             _uiState.update { it.copy(isExemptAppsLoading = true) }
             try {
                 val shell = if (settings.privilegedAccess() == PrivilegedAccess.ROOT) rootShell else shizukuShell
-                
-                // 注意：这里假设你的 shell 接口里有一个 exec(command: String): String 的方法。
-                // 如果没有，你需要根据你的 RootShell/ShizukuShell 源码替换成正确的执行方法。
-                val output = withContext(Dispatchers.IO) {
-                    // 执行系统命令获取白名单
-                    shell.exec("dumpsys deviceidle whitelist")
-                }
-                
-                // 解析结果
-                // 输出格式大概长这样：
-                // system-excidle,1000,android
-                // system,10089,com.tencent.mm
-                val list = output.lines()
-                    .map { it.trim() }
-                    .filter { it.isNotEmpty() && it.contains(",") }
-                    .map { line ->
-                        val parts = line.split(",")
-                        if (parts.size >= 3) parts[2] else line
-                    }.distinct()
-                    
+                val output = withContext(Dispatchers.IO) { shell.exec("dumpsys deviceidle whitelist") }
+                val list = output.lines().map { it.trim() }.filter { it.isNotEmpty() && it.contains(",") }.map { line ->
+                    val parts = line.split(",")
+                    if (parts.size >= 3) parts[2] else line
+                }.distinct()
                 _uiState.update { it.copy(exemptAppsList = list, isExemptAppsLoading = false) }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -191,19 +181,13 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    // 🎯 模块三新增：从白名单中移除
     fun removeExemptApp(packageName: String) {
         viewModelScope.launch {
             try {
                 val shell = if (settings.privilegedAccess() == PrivilegedAccess.ROOT) rootShell else shizukuShell
-                withContext(Dispatchers.IO) {
-                    shell.exec("dumpsys deviceidle whitelist -$packageName")
-                }
-                // 成功后刷新列表
+                withContext(Dispatchers.IO) { shell.exec("dumpsys deviceidle whitelist -$packageName") }
                 loadExemptApps()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (e: Exception) { e.printStackTrace() }
         }
     }
 
@@ -217,7 +201,6 @@ class DashboardViewModel @Inject constructor(
 
     fun completeOnboarding() { settings.setOnboardingShown(); _uiState.update { it.copy(onboardingCompleted = true) } }
     fun onClassicLookChange(enabled: Boolean) { settings.setClassicLook(enabled); _uiState.update { it.copy(classicLook = enabled) } }
-
     private var rootRequest = 0
     private var shizukuRequest = 0
 
@@ -226,9 +209,7 @@ class DashboardViewModel @Inject constructor(
         if (!enabled) {
             if (settings.privilegedAccess() == PrivilegedAccess.ROOT && profileNeedsRoot()) {
                 _uiState.update { it.copy(rootStatus = RootStatus.RESTORING) }
-                viewModelScope.launch {
-                    withContext(NonCancellable) { restoreStockQuietly(); switchRootOff() }
-                }
+                viewModelScope.launch { withContext(NonCancellable) { restoreStockQuietly(); switchRootOff() } }
                 return
             }
             switchRootOff(); return
