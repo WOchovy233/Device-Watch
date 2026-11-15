@@ -71,10 +71,6 @@ import org.jarsi.devicewatch.presentation.RootStatus
 import org.jarsi.devicewatch.presentation.ShizukuStatus
 import kotlin.math.roundToInt
 
-/**
- * Settings tab: data counter period, charge reminder, widget opacity, and special access.
- * (Screensaver settings have been removed)
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SettingsTab(
@@ -89,6 +85,8 @@ internal fun SettingsTab(
     onCommitDataQuota: () -> Unit,
     onChargeLimitChange: (Int) -> Unit,
     onCommitChargeLimit: () -> Unit,
+    onChargeLimitSoundToggle: (Boolean) -> Unit, // 🎯 新增参数
+    onChargeLimitVibrateToggle: (Boolean) -> Unit, // 🎯 新增参数
     onClassicLookChange: (Boolean) -> Unit,
     onRootModeChange: (Boolean) -> Unit,
     onShizukuModeChange: (Boolean) -> Unit,
@@ -101,14 +99,11 @@ internal fun SettingsTab(
     onShowIntro: () -> Unit,
 ) {
     val context = LocalContext.current
-    // The overlay permission is granted on a system page; it is read again on every return.
     LifecycleResumeEffect(Unit) {
         onOverlayPermissionChecked(Settings.canDrawOverlays(context))
         onPauseOrDispose { }
     }
 
-    // Runtime-permission status mirrors the intro's permission page, so Settings
-    // shows all three grants — not just the two special-access ones.
     var runtimePermissionsGranted by remember {
         mutableStateOf(missingRuntimePermissions(context).isEmpty())
     }
@@ -121,8 +116,6 @@ internal fun SettingsTab(
         runtimePermissionsGranted = missingRuntimePermissions(context).isEmpty()
         onPauseOrDispose { }
     }
-    // An alert switched on without the notification permission would never show:
-    // ask for that one permission right there, not the intro's whole set.
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) {
@@ -137,8 +130,6 @@ internal fun SettingsTab(
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    // The figures live in a notification: one chosen without the permission would
-    // never show, so it is asked for there, as for the alerts.
     val onNotificationMetricSwitch: (QuickMetric, Boolean) -> Unit = { metric, enabled ->
         onNotificationMetricToggle(metric, enabled)
         if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -148,7 +139,6 @@ internal fun SettingsTab(
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    // Denied for good, or switched off in Android's settings: only Android's own page can turn them back on.
     var notificationsEnabled by remember {
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
@@ -296,6 +286,22 @@ internal fun SettingsTab(
                     valueRange = CHARGE_LIMIT_MIN.toFloat()..CHARGE_LIMIT_MAX.toFloat(),
                     steps = 8,
                     modifier = Modifier.fillMaxWidth()
+                )
+                
+                // 🎯 新增：声音和震动开关
+                Spacer(modifier = Modifier.height(12.dp))
+                SettingsToggleRow(
+                    titleRes = R.string.charge_limit_sound_title,
+                    descriptionRes = R.string.charge_limit_sound_description,
+                    checked = uiState.chargeLimitPlaySound,
+                    onCheckedChange = onChargeLimitSoundToggle
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                SettingsToggleRow(
+                    titleRes = R.string.charge_limit_vibrate_title,
+                    descriptionRes = R.string.charge_limit_vibrate_description,
+                    checked = uiState.chargeLimitVibrate,
+                    onCheckedChange = onChargeLimitVibrateToggle
                 )
             }
         }
@@ -571,8 +577,6 @@ internal fun SettingsTab(
             }
         }
 
-        // 🎯 模块一：删除了原本这里的 ScreensaverSettingsSection 屏保区块
-
         // Special access — the dot is green when granted, red when missing
         SettingsSectionCard(titleRes = R.string.special_access_section) {
             Row(
@@ -672,7 +676,6 @@ internal fun SettingsTab(
 
 @Composable
 internal fun AccessStatusDot(granted: Boolean) {
-    // Color is the only visual signal, so TalkBack needs the state spelled out.
     val stateText = stringResource(
         if (granted) R.string.access_state_granted else R.string.access_state_missing
     )
@@ -685,7 +688,6 @@ internal fun AccessStatusDot(granted: Boolean) {
     )
 }
 
-/** Android's notification page for this app, or its app page where an OEM build lacks the former. */
 private fun openAppNotificationSettings(context: Context) {
     val notifications = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
@@ -704,7 +706,6 @@ private fun openAppNotificationSettings(context: Context) {
     }
 }
 
-/** The system's "Display over other apps" page for this app. */
 private fun openOverlayPermissionPage(context: Context) {
     try {
         context.startActivity(
