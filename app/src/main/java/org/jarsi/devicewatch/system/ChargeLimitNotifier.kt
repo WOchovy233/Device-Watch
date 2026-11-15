@@ -18,15 +18,14 @@ import org.jarsi.devicewatch.MainActivity
 import org.jarsi.devicewatch.R
 
 object ChargeLimitNotifier {
-    // 🎯 核心大招：ID换成了 v4！这样系统会把咱们当成一个全新的通道，绝不会继承你之前设置为“无声”的烂设置！
-    private const val CHANNEL_ID = "battery_full_channel_v4" 
+    // 🎯 换成了 v5！强制系统建一个全新的通道，摆脱你之前的静音设置
+    private const val CHANNEL_ID = "battery_full_channel_v5" 
     private const val NOTIFICATION_ID = 1003
 
     @SuppressLint("MissingPermission")
     fun show(context: Context, levelPercent: Int, playSound: Boolean, vibrate: Boolean): Boolean {
         if (!canPostNotifications(context)) return false
         
-        // 强行创建全新的带声音和震动的通道
         createChannel(context, playSound, vibrate)
 
         val contentIntent = PendingIntent.getActivity(
@@ -44,10 +43,10 @@ object ChargeLimitNotifier {
             .setContentText(context.getString(R.string.charge_limit_notification_text))
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH) // 最高优先级，保证弹出来
-            .setCategory(NotificationCompat.CATEGORY_ALARM) // 伪装成闹钟，防止被系统深度休眠屏蔽
+            .setOnlyAlertOnce(true) // 🎯 关键：同一个通知只响一次，防止电量涨到86%、87%时疯狂响
+            .setPriority(NotificationCompat.PRIORITY_HIGH) 
+            .setCategory(NotificationCompat.CATEGORY_ALARM) 
 
-        // 兼容老的 setDefaults 写法
         when {
             playSound && vibrate -> builder.setDefaults(NotificationCompat.DEFAULT_ALL)
             playSound -> builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
@@ -85,16 +84,15 @@ object ChargeLimitNotifier {
         ).apply {
             description = context.getString(R.string.battery_full_channel_description)
             
-            // 🎯 强制写死震动！
             enableVibration(true)
-            vibrationPattern = longArrayOf(0, 500, 200, 500) // 震一下，停一下，再震一下
+            vibrationPattern = longArrayOf(0, 500, 200, 500) 
             
-            // 🎯 强制写死声音！
             if (playSound) {
-                val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                // 🎯 强行借用系统的闹钟铃声
+                val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 val audioAttributes = AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ALARM) // 🎯 走闹钟通道，静音也能响！
                     .build()
                 setSound(soundUri, audioAttributes)
             }
