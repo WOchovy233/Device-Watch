@@ -175,7 +175,6 @@ class SystemMonitorService : Service() {
         )
         if (!decision.notify) return
         
-        // 🎯 读取用户开关状态，并传进去
         val playSound = appSettings.chargeLimitPlaySound()
         val vibrate = appSettings.chargeLimitVibrate()
         
@@ -372,7 +371,6 @@ class SystemMonitorService : Service() {
                         chargeAnchorStore.save(
                             ChargeAnchorLogic.onPowerConnected(chargeAnchorStore.load())
                         )
-                        // 之前已经把强制亮屏代码删了，这里空的
                     }
                     Intent.ACTION_POWER_DISCONNECTED -> {
                         chargeLimitState = ChargeLimitLogic.onPowerDisconnected(chargeLimitState)
@@ -437,7 +435,20 @@ class SystemMonitorService : Service() {
     }
 
     private suspend fun liveText(chosen: Set<QuickMetric>, stats: SystemStats): LiveNotificationText? {
-        val dataToday = if (QuickMetric.DATA_TODAY in chosen) quickStats.dataToday() else null
+        // 🎯 核心修改：这里不再调 quickStats.dataToday()，而是用周期数据直接拼装
+        val dataToday = if (QuickMetric.DATA_TODAY in chosen) {
+            val used = stats.mobileDataUsedGb
+            val total = stats.mobileDataTotalGb
+            if (total > 0.0) {
+                val remain = (total - used).coerceAtLeast(0.0)
+                // 直接显示 "已用70.0G/剩50.0G"
+                String.format(Locale.getDefault(), "已用%.1fG/剩%.1fG", used, remain)
+            } else {
+                // 如果没设置套餐上限，就显示已用
+                String.format(Locale.getDefault(), "%.1fG", used)
+            }
+        } else null
+
         val labels = quickMetricLabels(applicationContext)
         val extendedAccess = appSettings.privilegedAccess() != PrivilegedAccess.OFF
         val readings = QuickMetric.entries.filter { it in chosen }
