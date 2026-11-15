@@ -404,6 +404,9 @@ fun SystemDashboardScreen(
                             onCommitDataQuota = viewModel::onCommitDataQuota,
                             onChargeLimitChange = viewModel::onChargeLimitChange,
                             onCommitChargeLimit = viewModel::onCommitChargeLimit,
+                            // 🎯 新增：接上声音和震动开关
+                            onChargeLimitSoundToggle = viewModel::onChargeLimitPlaySoundToggle,
+                            onChargeLimitVibrateToggle = viewModel::onChargeLimitVibrateToggle,
                             onClassicLookChange = viewModel::onClassicLookChange,
                             onRootModeChange = viewModel::onRootModeChange,
                             onShizukuModeChange = viewModel::onShizukuModeChange,
