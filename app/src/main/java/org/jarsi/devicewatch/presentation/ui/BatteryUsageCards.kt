@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -152,6 +153,10 @@ internal fun BatteryAppsCard(report: BatteryUsageReport) {
                     .padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // 🎯 新增：App 图标
+                AppIcon(app.packageName, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                
                 Text(
                     text = app.label,
                     fontSize = 14.sp,
@@ -206,6 +211,12 @@ private fun WakeList(@StringRes titleRes: Int, entries: List<WakeEntry>) {
         val plainName = entry.owner ?: entry.category?.let { stringResource(wakeCategoryRes(it)) }
         Column(modifier = Modifier.padding(vertical = 5.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 🎯 新增：如果是 App（owner 不为空），则显示图标
+                if (entry.owner != null) {
+                    AppIcon(entry.owner, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+                
                 Text(
                     text = plainName ?: entry.names.first(),
                     fontSize = 14.sp,
