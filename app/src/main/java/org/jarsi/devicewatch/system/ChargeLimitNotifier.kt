@@ -18,8 +18,8 @@ import org.jarsi.devicewatch.MainActivity
 import org.jarsi.devicewatch.R
 
 object ChargeLimitNotifier {
-    // 🎯 换成了 v5！强制系统建一个全新的通道，摆脱你之前的静音设置
-    private const val CHANNEL_ID = "battery_full_channel_v5" 
+    // 🎯 终极流氓大招：ID换成 v6！绕开所有之前的系统缓存！
+    private const val CHANNEL_ID = "battery_full_channel_v6" 
     private const val NOTIFICATION_ID = 1003
 
     @SuppressLint("MissingPermission")
@@ -35,6 +35,7 @@ object ChargeLimitNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // 🎯 强制全部开启，不走系统设置
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(
@@ -43,16 +44,10 @@ object ChargeLimitNotifier {
             .setContentText(context.getString(R.string.charge_limit_notification_text))
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
-            .setOnlyAlertOnce(true) // 🎯 关键：同一个通知只响一次，防止电量涨到86%、87%时疯狂响
-            .setPriority(NotificationCompat.PRIORITY_HIGH) 
+            .setOnlyAlertOnce(true) 
+            .setPriority(NotificationCompat.PRIORITY_MAX) // 最高优先级
             .setCategory(NotificationCompat.CATEGORY_ALARM) 
-
-        when {
-            playSound && vibrate -> builder.setDefaults(NotificationCompat.DEFAULT_ALL)
-            playSound -> builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
-            vibrate -> builder.setDefaults(NotificationCompat.DEFAULT_VIBRATE)
-            else -> builder.setDefaults(0) 
-        }
+            .setDefaults(NotificationCompat.DEFAULT_ALL) // 强制声音+震动
 
         return try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
@@ -88,11 +83,11 @@ object ChargeLimitNotifier {
             vibrationPattern = longArrayOf(0, 500, 200, 500) 
             
             if (playSound) {
-                // 🎯 强行借用系统的闹钟铃声
-                val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                // 🎯 终极杀招：借用“媒体音量”（听歌的通道）！手机静音它也能响！
+                val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
                 val audioAttributes = AudioAttributes.Builder()
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_ALARM) // 🎯 走闹钟通道，静音也能响！
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC) // 音乐类型
+                    .setUsage(AudioAttributes.USAGE_MEDIA) // 媒体通道！
                     .build()
                 setSound(soundUri, audioAttributes)
             }
