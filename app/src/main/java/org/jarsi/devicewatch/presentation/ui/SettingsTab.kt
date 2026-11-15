@@ -99,8 +99,6 @@ internal fun SettingsTab(
     onShowIntro: () -> Unit,
 ) {
     val context = LocalContext.current
-    // 🎯 这是一个临时状态，等咱们把底层搞定了，再把它存进数据库里
-    var isMonthDataEnabled by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(Unit) {
         onOverlayPermissionChecked(Settings.canDrawOverlays(context))
@@ -308,7 +306,7 @@ internal fun SettingsTab(
             }
         }
 
-        // Optional alerts, all off by default
+        // Optional alerts
         SettingsSectionCard(titleRes = R.string.alerts_section) {
             Text(
                 text = stringResource(R.string.alerts_description),
@@ -359,21 +357,8 @@ internal fun SettingsTab(
             
             QuickMetric.entries.forEach { metric ->
                 Spacer(modifier = Modifier.height(12.dp))
-                // 🎯 原汁原味的“今日流量”开关
-                SettingsToggleRow(
-                    titleRes = quickMetricTitleRes(metric),
-                    descriptionRes = when (metric) {
-                        QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
-                        QuickMetric.DATA_TODAY -> R.string.quick_data_today_setting_description
-                        else -> null
-                    },
-                    checked = metric in uiState.notificationMetrics,
-                    onCheckedChange = { onNotificationMetricSwitch(metric, it) }
-                )
-
-                // 🎯 核心改变：在原版“今日流量”下面，硬加一个独立的“本月流量” UI
-                if (metric == QuickMetric.DATA_TODAY) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                if (metric == QuickMetric.DATA_MONTH) {
+                    // 🎯 这个就是我们全新的“本月流量”，完美独立！
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -394,10 +379,22 @@ internal fun SettingsTab(
                             )
                         }
                         Switch(
-                            checked = isMonthDataEnabled,
-                            onCheckedChange = { isMonthDataEnabled = it }
+                            checked = metric in uiState.notificationMetrics,
+                            onCheckedChange = { onNotificationMetricSwitch(metric, it) }
                         )
                     }
+                } else {
+                    // 原汁原味的其他开关（包括今日流量）
+                    SettingsToggleRow(
+                        titleRes = quickMetricTitleRes(metric),
+                        descriptionRes = when (metric) {
+                            QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
+                            QuickMetric.DATA_TODAY -> R.string.quick_data_today_setting_description
+                            else -> null
+                        },
+                        checked = metric in uiState.notificationMetrics,
+                        onCheckedChange = { onNotificationMetricSwitch(metric, it) }
+                    )
                 }
             }
         }
@@ -459,21 +456,8 @@ internal fun SettingsTab(
                 Spacer(modifier = Modifier.height(12.dp))
                 val chosen = metric in uiState.overlayMetrics
                 
-                // 🎯 悬浮窗里也是一样，先显示原版，再加独立的
-                SettingsToggleRow(
-                    titleRes = quickMetricTitleRes(metric),
-                    descriptionRes = when (metric) {
-                        QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
-                        QuickMetric.DATA_TODAY -> R.string.quick_data_today_setting_description
-                        else -> null
-                    },
-                    checked = chosen,
-                    onCheckedChange = { onOverlayMetricToggle(metric, it) },
-                    enabled = chosen || !full,
-                )
-
-                if (metric == QuickMetric.DATA_TODAY) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                if (metric == QuickMetric.DATA_MONTH) {
+                    // 🎯 悬浮窗里的“本月流量”
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -494,11 +478,24 @@ internal fun SettingsTab(
                             )
                         }
                         Switch(
-                            checked = isMonthDataEnabled,
-                            onCheckedChange = { isMonthDataEnabled = it },
-                            enabled = isMonthDataEnabled || !full
+                            checked = chosen,
+                            onCheckedChange = { onOverlayMetricToggle(metric, it) },
+                            enabled = chosen || !full
                         )
                     }
+                } else {
+                    // 原汁原味的其他开关
+                    SettingsToggleRow(
+                        titleRes = quickMetricTitleRes(metric),
+                        descriptionRes = when (metric) {
+                            QuickMetric.CPU_TEMP -> R.string.quick_cpu_temp_setting_description
+                            QuickMetric.DATA_TODAY -> R.string.quick_data_today_setting_description
+                            else -> null
+                        },
+                        checked = chosen,
+                        onCheckedChange = { onOverlayMetricToggle(metric, it) },
+                        enabled = chosen || !full,
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -574,7 +571,7 @@ internal fun SettingsTab(
             )
         }
 
-        // Privileged access: Shizuku or root
+        // Privileged access
         SettingsSectionCard(titleRes = R.string.privileged_section) {
             Spacer(modifier = Modifier.height(4.dp))
             SettingsToggleRow(
@@ -642,7 +639,7 @@ internal fun SettingsTab(
             }
         }
 
-        // Special access — the dot is green when granted, red when missing
+        // Special access
         SettingsSectionCard(titleRes = R.string.special_access_section) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
