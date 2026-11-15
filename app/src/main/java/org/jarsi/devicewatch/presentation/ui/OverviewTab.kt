@@ -2,6 +2,7 @@ package org.jarsi.devicewatch.presentation.ui
 
 import android.content.Intent
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -37,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,29 +78,34 @@ internal fun OverviewTab(
     onOpenHistory: () -> Unit,
     onOpenSinceCharge: () -> Unit,
     onHideWidgetHint: () -> Unit,
-    // 🎯 核心修复：把应用页面的 ViewModel 注入进来拿流量数据
     appsViewModel: AppsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val currentStats = uiState.stats ?: return
 
-    // 🎯 拿到应用页面的状态（包含所有 App 的流量清单）
+    // 拿到应用页面的状态
     val appsUiState by appsViewModel.uiState.collectAsStateWithLifecycle()
 
-    // 🎯 用于暂存导出文本内容
+    // 一进主页就强制刷新应用流量数据
+    LaunchedEffect(Unit) {
+        appsViewModel.refresh()
+    }
+
     var exportTextContent by remember { mutableStateOf("") }
 
-    // 🎯 调起系统保存 txt 文件
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/plain")
     ) { uri ->
         if (uri != null) {
             try {
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    outputStream.write(exportTextContent.toByteArray())
+                    // 写入 UTF-8 内容
+                    outputStream.write(exportTextContent.toByteArray(Charsets.UTF_8))
                 }
+                Toast.makeText(context, "导出成功！", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 e.printStackTrace()
+                Toast.makeText(context, "导出失败：${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -421,7 +428,7 @@ internal fun OverviewTab(
             }
         }
 
-        // 🎯 流量统计卡片（核心修复：使用 appsUiState.dataConsumers 导出）
+        // 流量统计卡片
         SettingsSectionCard(titleRes = R.string.data_counter_section) {
             StackedMetricRow(
                 label = stringResource(wifiDataLabelRes(uiState.dataCounterMode)),
@@ -464,26 +471,33 @@ internal fun OverviewTab(
                 )
             }
 
-            // 🎯 导出按钮
+            // 导出按钮
             Spacer(modifier = Modifier.height(12.dp))
             TextButton(
                 onClick = withTapHaptic {
+                    // 如果数据为空，提示用户稍等，并再次触发刷新
+                    if (appsUiState.dataConsumers.isEmpty()) {
+                        appsViewModel.refresh()
+                        Toast.makeText(context, "数据拉取中，请等待3秒后再点一次导出！", Toast.LENGTH_LONG).show()
+                        return@withTapHaptic
+                    }
+
                     val sb = StringBuilder()
-                    sb.append("📱 设备流量全量审计报告\n")
+                    // 去除所有表情符号，保证老旧记事本不乱码
+                    sb.append("【设备流量全量审计报告】\n")
                     sb.append("导出时间: ${LocalDate.now()}\n")
                     sb.append("统计周期: ${if (uiState.dataCounterMode == DataCounterMode.DAY) "今日" else "本月（计费周期）"}\n")
                     sb.append("==============================\n\n")
                     
-                    // 🎯 核心：从 appsUiState 拿到所有 App 的流量数据并全量输出
                     val sortedData = appsUiState.dataConsumers.sortedByDescending { it.bytes }
                     var count = 0
                     
                     sortedData.forEach { consumer ->
                         if (consumer.bytes > 0) {
-                            val pkgName = consumer.packageName ?: "无包名(系统服务)"
-                            sb.append("📦 应用名称: ${consumer.label}\n")
-                            sb.append("🔗 包名: $pkgName\n")
-                            sb.append("📊 消耗流量: ${bytesText(consumer.bytes)}\n")
+                            val pkgName = consumer.packageName ?: "系统服务(无包名)"
+                            sb.append("应用名称: ${consumer.label}\n")
+                            sb.append("应用包名: $pkgName\n")
+                            sb.append("消耗流量: ${bytesText(consumer.bytes)}\n")
                             sb.append("------------------------------\n")
                             count++
                         }
@@ -500,7 +514,7 @@ internal fun OverviewTab(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("📥 导出全量流量明细 (TXT)", fontWeight = FontWeight.Bold)
+                Text("导出全量流量明细 (TXT)", fontWeight = FontWeight.Bold)
             }
         }
 
