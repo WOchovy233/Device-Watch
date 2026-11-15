@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -61,6 +62,7 @@ import org.jarsi.devicewatch.presentation.PeriodComparison
 import org.jarsi.devicewatch.ui.theme.STATUS_TINT_ALPHA
 import org.jarsi.devicewatch.widget.mobileDataText
 
+@OptIn(ExperimentalLayoutApi::class) // 🎯 修复：FlowRow 是实验性 API，必须加这个注解防报错
 @Composable
 internal fun OverviewTab(
     uiState: DashboardUiState,
