@@ -167,8 +167,14 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isExemptAppsLoading = true) }
             try {
-                val shell = if (settings.privilegedAccess() == PrivilegedAccess.ROOT) rootShell else shizukuShell
-                val output = withContext(Dispatchers.IO) { shell.exec("dumpsys deviceidle whitelist") }
+                // 修复：拆开 if-else，让编译器能正确识别 exec 方法
+                val output = withContext(Dispatchers.IO) {
+                    if (settings.privilegedAccess() == PrivilegedAccess.ROOT) {
+                        rootShell.exec("dumpsys deviceidle whitelist")
+                    } else {
+                        shizukuShell.exec("dumpsys deviceidle whitelist")
+                    }
+                }
                 val list = output.lines().map { it.trim() }.filter { it.isNotEmpty() && it.contains(",") }.map { line ->
                     val parts = line.split(",")
                     if (parts.size >= 3) parts[2] else line
@@ -184,8 +190,14 @@ class DashboardViewModel @Inject constructor(
     fun removeExemptApp(packageName: String) {
         viewModelScope.launch {
             try {
-                val shell = if (settings.privilegedAccess() == PrivilegedAccess.ROOT) rootShell else shizukuShell
-                withContext(Dispatchers.IO) { shell.exec("dumpsys deviceidle whitelist -$packageName") }
+                // 修复：拆开 if-else，让编译器能正确识别 exec 方法
+                withContext(Dispatchers.IO) {
+                    if (settings.privilegedAccess() == PrivilegedAccess.ROOT) {
+                        rootShell.exec("dumpsys deviceidle whitelist -$packageName")
+                    } else {
+                        shizukuShell.exec("dumpsys deviceidle whitelist -$packageName")
+                    }
+                }
                 loadExemptApps()
             } catch (e: Exception) { e.printStackTrace() }
         }
