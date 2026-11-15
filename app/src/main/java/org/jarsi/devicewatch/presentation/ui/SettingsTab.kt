@@ -63,7 +63,6 @@ import org.jarsi.devicewatch.R
 import org.jarsi.devicewatch.data.CHARGE_LIMIT_MAX
 import org.jarsi.devicewatch.data.CHARGE_LIMIT_MIN
 import org.jarsi.devicewatch.data.DATA_QUOTA_MIN_GB
-import org.jarsi.devicewatch.data.DATA_QUOTA_SLIDER_MAX_GB
 import org.jarsi.devicewatch.data.DEFAULT_CHARGE_LIMIT_PERCENT
 import org.jarsi.devicewatch.data.DEFAULT_DATA_QUOTA_GB
 import org.jarsi.devicewatch.data.DataCounterMode
@@ -73,8 +72,8 @@ import org.jarsi.devicewatch.presentation.ShizukuStatus
 import kotlin.math.roundToInt
 
 /**
- * Settings tab: data counter period, charge reminder, widget opacity, screensaver
- * and special access.
+ * Settings tab: data counter period, charge reminder, widget opacity, and special access.
+ * (Screensaver settings have been removed)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -572,11 +571,7 @@ internal fun SettingsTab(
             }
         }
 
-        // Screensaver settings
-        ScreensaverSettingsSection(
-            notificationAccessEnabled = uiState.notificationAccessEnabled,
-            onOpenDreamSettings = { openSpecialAccessSettings(Settings.ACTION_DREAM_SETTINGS) },
-        )
+        // 🎯 模块一：删除了原本这里的 ScreensaverSettingsSection 屏保区块
 
         // Special access — the dot is green when granted, red when missing
         SettingsSectionCard(titleRes = R.string.special_access_section) {
