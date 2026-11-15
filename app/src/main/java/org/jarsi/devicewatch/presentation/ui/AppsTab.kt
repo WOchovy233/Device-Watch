@@ -106,14 +106,17 @@ internal fun AppsTab(
         )
     }
 
-    // 🎯 新增：全量数据的弹窗
+    // 🎯 新增：全量数据的弹窗（这里原本你的 it.packageName!! 会报错，因为泛型 T 不知道有 packageName，我用 as? 转换了一下，不影响你原本功能）
     if (showAllData) {
         ListDialog(
             title = "全量流量使用",
             apps = uiState.dataConsumers,
             valueText = { bytesText(it.bytes) },
             onDismiss = { showAllData = false },
-            onAppSelected = { viewModel.onAppSelected(it.packageName!!); showAllData = false }
+            onAppSelected = { 
+                val pkg = (it as? org.jarsi.devicewatch.data.AppDataUsage)?.packageName
+                if (pkg != null) { viewModel.onAppSelected(pkg); showAllData = false }
+            }
         )
     }
     if (showAllStorage) {
@@ -122,7 +125,10 @@ internal fun AppsTab(
             apps = uiState.storageConsumers,
             valueText = { bytesText(it.bytes) },
             onDismiss = { showAllStorage = false },
-            onAppSelected = { viewModel.onAppSelected(it.packageName); showAllStorage = false }
+            onAppSelected = { 
+                val pkg = (it as? org.jarsi.devicewatch.data.AppStorageUsage)?.packageName
+                if (pkg != null) { viewModel.onAppSelected(pkg); showAllStorage = false }
+            }
         )
     }
     if (showAllScreenTime) {
@@ -131,7 +137,10 @@ internal fun AppsTab(
             apps = uiState.screenTimes,
             valueText = { durationText(context, it.foregroundMillis) },
             onDismiss = { showAllScreenTime = false },
-            onAppSelected = { viewModel.onAppSelected(it.packageName); showAllScreenTime = false }
+            onAppSelected = { 
+                val pkg = (it as? org.jarsi.devicewatch.data.AppScreenTime)?.packageName
+                if (pkg != null) { viewModel.onAppSelected(pkg); showAllScreenTime = false }
+            }
         )
     }
 
@@ -176,7 +185,10 @@ internal fun AppsTab(
                 // 只显示前 5 项
                 uiState.screenTimeSegments.take(5).forEachIndexed { index, segment ->
                     val rowModifier = if (segment.packageName != null) {
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = withTapHaptic { viewModel.onAppSelected(segment.packageName!!) }).padding(vertical = 6.dp, horizontal = 4.dp)
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = withTapHaptic { 
+                            // 修复：这里是报错重灾区，去掉了 !!
+                            segment.packageName?.let { viewModel.onAppSelected(it) } 
+                        }).padding(vertical = 6.dp, horizontal = 4.dp)
                     } else {
                         Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 4.dp)
                     }
@@ -222,12 +234,18 @@ internal fun AppsTab(
             SettingsSectionCard(titleRes = R.string.data_consumers_section) {
                 uiState.dataConsumers.take(5).forEach { consumer ->
                     val rowModifier = if (consumer.packageName != null) {
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = withTapHaptic { viewModel.onAppSelected(consumer.packageName!!) }).padding(vertical = 6.dp, horizontal = 4.dp)
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = withTapHaptic { 
+                            // 修复：去掉了 !!
+                            consumer.packageName?.let { viewModel.onAppSelected(it) } 
+                        }).padding(vertical = 6.dp, horizontal = 4.dp)
                     } else {
                         Modifier.fillMaxWidth().padding(vertical = 6.dp, horizontal = 4.dp)
                     }
                     Row(modifier = rowModifier, verticalAlignment = Alignment.CenterVertically) {
-                        if (consumer.packageName != null) AppIcon(consumer.packageName!!, modifier = Modifier.size(28.dp)) else Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant))
+                        if (consumer.packageName != null) {
+                            // 修复：去掉了 !!
+                            consumer.packageName?.let { AppIcon(it, modifier = Modifier.size(28.dp)) }
+                        } else Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant))
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(text = consumer.label, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textDecoration = detailLinkDecoration(consumer.packageName != null), modifier = Modifier.weight(1f))
                         Spacer(modifier = Modifier.width(8.dp))
@@ -264,7 +282,7 @@ internal fun AppsTab(
             }
         }
 
-        // 🎯 应用列表区（劈成两半）
+        // 🎯 应用列表区（劈成两半） - 修复：时间过滤加上了 ?: 0L
         item(key = "recent_opened_header") {
             Text(
                 text = "最近打开",
@@ -274,7 +292,7 @@ internal fun AppsTab(
                 modifier = Modifier.fillMaxWidth().padding(start = BAND_INSET, end = BAND_INSET, top = 8.dp, bottom = 4.dp)
             )
         }
-        items(uiState.apps.filter { it.lastUsedEpochMillis > 0 }.sortedByDescending { it.lastUsedEpochMillis }.take(10), key = { it.packageName }) { app ->
+        items(uiState.apps.filter { (it.lastUsedEpochMillis ?: 0L) > 0L }.sortedByDescending { it.lastUsedEpochMillis ?: 0L }.take(10), key = { it.packageName }) { app ->
             AppListRow(app = app, onClick = { viewModel.onAppSelected(app.packageName) }, onUninstall = { uninstallLauncher.launch(Intent(Intent.ACTION_DELETE, "package:${app.packageName}".toUri())) })
         }
 
@@ -287,7 +305,7 @@ internal fun AppsTab(
                 modifier = Modifier.fillMaxWidth().padding(start = BAND_INSET, end = BAND_INSET, top = 16.dp, bottom = 4.dp)
             )
         }
-        items(uiState.apps.filter { it.lastUsedEpochMillis > 0 }.sortedBy { it.lastUsedEpochMillis }.take(10), key = { it.packageName }) { app ->
+        items(uiState.apps.filter { (it.lastUsedEpochMillis ?: 0L) > 0L }.sortedBy { it.lastUsedEpochMillis ?: 0L }.take(10), key = { it.packageName }) { app ->
             AppListRow(app = app, onClick = { viewModel.onAppSelected(app.packageName) }, onUninstall = { uninstallLauncher.launch(Intent(Intent.ACTION_DELETE, "package:${app.packageName}".toUri())) })
         }
     }
@@ -348,8 +366,11 @@ private fun AppListRow(app: LaunchableApp, onClick: () -> Unit, onUninstall: () 
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = app.label, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, textDecoration = detailLinkDecoration(true))
-            val tier = UsageEventAggregator.lastUsedTier(daysSinceLastUse(app.lastUsedEpochMillis))
-            Text(maxLines = 1, overflow = TextOverflow.Ellipsis, text = lastUsedText(app.lastUsedEpochMillis), fontSize = 12.sp, color = lastUsedTierColor(tier))
+            
+            // 修复：这里原本传参如果是空会报错，现在处理了空值
+            val lastUsed = app.lastUsedEpochMillis ?: 0L
+            val tier = UsageEventAggregator.lastUsedTier(daysSinceLastUse(lastUsed))
+            Text(maxLines = 1, overflow = TextOverflow.Ellipsis, text = lastUsedText(lastUsed), fontSize = 12.sp, color = lastUsedTierColor(tier))
         }
         if (!app.isSystemApp) {
             IconButton(onClick = withTapHaptic(onUninstall)) {
