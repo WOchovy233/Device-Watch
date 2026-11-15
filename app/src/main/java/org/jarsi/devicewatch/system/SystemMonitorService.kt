@@ -166,20 +166,16 @@ class SystemMonitorService : Service() {
         evaluateChargeLimit(level, plugged = batteryStatus.isCharging())
     }
 
+    // 🎯 核心大招：废掉所有脑残限制，到了阈值直接干！
     private fun evaluateChargeLimit(level: Int, plugged: Boolean) {
-        val decision = ChargeLimitLogic.onBatteryChanged(
-            chargeLimitState,
-            limitPercent = appSettings.chargeLimitPercent(),
-            level = level,
-            isPlugged = plugged,
-        )
-        if (!decision.notify) return
+        val limit = appSettings.chargeLimitPercent()
+        if (limit <= 0) return
         
-        val playSound = appSettings.chargeLimitPlaySound()
-        val vibrate = appSettings.chargeLimitVibrate()
-        
-        if (ChargeLimitNotifier.show(applicationContext, level.coerceIn(0, 100), playSound, vibrate)) {
-            chargeLimitState = decision.state
+        if (plugged && level >= limit) {
+            val playSound = appSettings.chargeLimitPlaySound()
+            val vibrate = appSettings.chargeLimitVibrate()
+            // 强制弹窗！不管它是不是已经弹过！
+            ChargeLimitNotifier.show(applicationContext, level.coerceIn(0, 100), playSound, vibrate)
         }
     }
 
@@ -371,6 +367,13 @@ class SystemMonitorService : Service() {
                         chargeAnchorStore.save(
                             ChargeAnchorLogic.onPowerConnected(chargeAnchorStore.load())
                         )
+                        // 🎯 强行建通道：一插上电就弹一次，确保能在系统里看到它！
+                        ChargeLimitNotifier.show(
+                            applicationContext, 
+                            lastBatteryLevel.coerceIn(0, 100), 
+                            appSettings.chargeLimitPlaySound(), 
+                            appSettings.chargeLimitVibrate()
+                        )
                     }
                     Intent.ACTION_POWER_DISCONNECTED -> {
                         chargeLimitState = ChargeLimitLogic.onPowerDisconnected(chargeLimitState)
@@ -435,7 +438,6 @@ class SystemMonitorService : Service() {
     }
 
     private suspend fun liveText(chosen: Set<QuickMetric>, stats: SystemStats): LiveNotificationText? {
-        // 🎯 已完全恢复为原作者版本，不再做任何移花接木，保证100%编译通过！
         val dataToday = if (QuickMetric.DATA_TODAY in chosen) quickStats.dataToday() else null
         val labels = quickMetricLabels(applicationContext)
         val extendedAccess = appSettings.privilegedAccess() != PrivilegedAccess.OFF
