@@ -2,10 +2,12 @@ package org.jarsi.devicewatch.presentation
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import org.jarsi.devicewatch.R
+import org.jarsi.devicewatch.data.AppUsageRepository
 import org.jarsi.devicewatch.data.BatteryHistory
 import org.jarsi.devicewatch.data.BatteryHistoryCodec
 import org.jarsi.devicewatch.data.BatterySample
@@ -23,6 +25,7 @@ import org.jarsi.devicewatch.di.DefaultDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -77,6 +80,7 @@ class HistoryViewModel @Inject constructor(
     private val notificationLog: NotificationLog,
     private val statsRepository: SystemStatsRepository,
     private val batteryHistory: BatteryHistory,
+    private val appUsageRepository: AppUsageRepository, // 🎯 新增：注入流量数据仓库
     @DefaultDispatcher private val dispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -158,6 +162,52 @@ class HistoryViewModel @Inject constructor(
                 if (!pendingMonthlyRefresh) {
                     if (_uiState.value.isRefreshing) delayForPullIndicator(pullStartMillis)
                     _uiState.update { it.copy(isRefreshing = false) }
+                }
+            }
+        }
+    }
+
+    // 🎯 新增：点击按钮才执行的全量流量导出
+    fun exportAllTrafficTxt(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // 算出本月 1 号 00:00:00 的时间戳
+                val monthStart = LocalDate.now()
+                    .withDayOfMonth(1)
+                    .atStartOfDay(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+
+                // 去底层拉取本月以来的所有流量数据
+                val allData = appUsageRepository.dataConsumersSince(monthStart)
+
+                // 拼成极简的 TXT 格式
+                val sb = StringBuilder()
+                sb.append("=== 本月全量流量账单（从 1 号开始） ===\n")
+                sb.append("应用名称 | 包名 | 消耗字节数\n\n")
+                
+                if (allData.isEmpty()) {
+                    sb.append("暂无数据（请确保已授予“使用情况访问权限”）\n")
+                } else {
+                    allData.forEach { app ->
+                        sb.append("${app.label} | ${app.packageName} | ${app.bytes} 字节\n")
+                    }
+                }
+
+                // 保存到手机私有目录：Android/data/org.jarsi.devicewatch/files/
+                val file = File(context.getExternalFilesDir(null), "全量流量内鬼名单.txt")
+                file.writeText(sb.toString())
+
+                // 弹个提示告诉用户文件存哪了
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "导出成功！文件已存至：${file.absolutePath}", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "导出失败: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
