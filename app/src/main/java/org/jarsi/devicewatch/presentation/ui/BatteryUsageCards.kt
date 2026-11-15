@@ -33,13 +33,16 @@ import org.jarsi.devicewatch.data.WakeEntry
 import org.jarsi.devicewatch.data.WakeGlossary
 import java.util.Locale
 
-/**
- * The since-charge page's view of Android's own battery statistics, which only a
- * privileged shell (Shizuku or root) can read. The figures are the system's raw
- * ones, so every section says in plain words what it shows and how to read it:
- * a pace per hour and how long a full battery would last at it, rather than
- * bare mAh and mA.
- */
+/** 根据 UID 获取包名，以便获取图标 */
+private fun getPackageNameByUid(context: Context, uid: Int?): String? {
+    if (uid == null || uid == -1) return null
+    return try {
+        context.packageManager.getPackagesForUid(uid)?.firstOrNull()
+    } catch (e: Exception) {
+        null
+    }
+}
+
 @Composable
 internal fun BatteryDrainCard(report: BatteryUsageReport) {
     val context = LocalContext.current
@@ -50,13 +53,11 @@ internal fun BatteryDrainCard(report: BatteryUsageReport) {
         if (usage.dischargeMeasured) {
             DrainRows(usage)
         } else {
-            // Zeros from a phone without a charge counter: no amount, no pace, no verdict.
             DetailText(stringResource(R.string.battery_usage_not_measured))
         }
     }
 }
 
-/** The amount, the pace with the screen on and off, and what the latter says about the phone's sleep. */
 @Composable
 private fun DrainRows(usage: BatteryUsage) {
     val locale = LocalLocale.current.platformLocale
@@ -92,10 +93,6 @@ private fun DrainRows(usage: BatteryUsage) {
     )
 }
 
-/**
- * "7.7 % per hour", then what that came from and what it means: how much went
- * in how long, and how long a full battery would last at that pace.
- */
 @Composable
 private fun DrainRow(
     @StringRes labelRes: Int,
@@ -105,7 +102,6 @@ private fun DrainRow(
     @StringRes verdictRes: Int?,
     verdictIsWarning: Boolean = false,
 ) {
-    // A dump that does not state this amount has no row for it.
     if (mah == null) return
     val context = LocalContext.current
     val locale = LocalLocale.current.platformLocale
@@ -143,6 +139,7 @@ private fun DrainRow(
 @Composable
 internal fun BatteryAppsCard(report: BatteryUsageReport) {
     val locale = LocalLocale.current.platformLocale
+    val context = LocalContext.current
 
     SettingsSectionCard(titleRes = R.string.battery_usage_apps_section) {
         SectionNote(stringResource(R.string.battery_usage_apps_note))
@@ -153,10 +150,15 @@ internal fun BatteryAppsCard(report: BatteryUsageReport) {
                     .padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 🎯 新增：App 图标
-                AppIcon(app.packageName, modifier = Modifier.size(24.dp))
+                // 🎯 通过底层传来的 uid 获取包名，并显示图标
+                val packageName = getPackageNameByUid(context, app.uid)
+                if (packageName != null) {
+                    AppIcon(packageName, modifier = Modifier.size(24.dp))
+                } else {
+                    Spacer(modifier = Modifier.size(24.dp))
+                }
                 Spacer(modifier = Modifier.width(12.dp))
-                
+
                 Text(
                     text = app.label,
                     fontSize = 14.sp,
@@ -207,13 +209,13 @@ private fun WakeList(@StringRes titleRes: Int, entries: List<WakeEntry>) {
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     entries.forEach { entry ->
-        // An app's name or a part of the phone when known; the kernel's own name otherwise.
         val plainName = entry.owner ?: entry.category?.let { stringResource(wakeCategoryRes(it)) }
         Column(modifier = Modifier.padding(vertical = 5.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // 🎯 新增：如果是 App（owner 不为空），则显示图标
-                if (entry.owner != null) {
-                    AppIcon(entry.owner, modifier = Modifier.size(24.dp))
+                // 🎯 通过底层传来的 uid 获取包名，并显示图标
+                val packageName = getPackageNameByUid(context, entry.uid)
+                if (packageName != null) {
+                    AppIcon(packageName, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(12.dp))
                 }
                 
@@ -232,8 +234,6 @@ private fun WakeList(@StringRes titleRes: Int, entries: List<WakeEntry>) {
                     fontWeight = FontWeight.Bold
                 )
             }
-            // In plain words what this was: the part of the phone, or the kind of
-            // background work the app's longest lock was for.
             val explanationRes = when {
                 entry.category != null -> wakeCategoryExplanationRes(entry.category)
                 entry.owner != null -> WakeGlossary.appWorkOf(entry.names.first())?.let(::appWorkRes)
@@ -246,7 +246,6 @@ private fun WakeList(@StringRes titleRes: Int, entries: List<WakeEntry>) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
-            // The technical names, for whoever wants to look one up.
             val technical = if (plainName != null) entry.names.take(TECHNICAL_NAMES_SHOWN).joinToString(", ") else null
             val times = if (entry.count > 0) {
                 pluralStringResource(R.plurals.battery_usage_times, entry.count, entry.count)
@@ -301,7 +300,6 @@ internal fun wakeCategoryRes(category: WakeCategory): Int = when (category) {
     WakeCategory.LOCATION -> R.string.wake_location
 }
 
-/** The sentence under a section's title that says what the section shows. */
 @Composable
 private fun SectionNote(text: String) {
     Text(
@@ -325,7 +323,6 @@ private fun DetailText(text: String, color: androidx.compose.ui.graphics.Color =
 
 private const val TECHNICAL_NAMES_SHOWN = 2
 
-/** Whole mAh from a hundred up, a decimal below, two below one. */
 internal fun mahText(mah: Double, locale: Locale): String = when {
     mah >= 100.0 -> String.format(locale, "%.0f mAh", mah)
     mah >= 1.0 -> String.format(locale, "%.1f mAh", mah)
@@ -335,14 +332,11 @@ internal fun mahText(mah: Double, locale: Locale): String = when {
 internal fun percentText(percent: Double, locale: Locale, decimals: Int = 1): String =
     String.format(locale, "%.${decimals}f %%", percent)
 
-/** Whole degrees: a part's temperature moves faster than a decimal can be read. */
 internal fun celsiusText(celsius: Double): String = "${Math.round(celsius)} °C"
 
-/** "13 h" from ten hours up, "7.5 h" below. */
 internal fun hoursText(hours: Double, locale: Locale): String =
     if (hours >= 10.0) String.format(locale, "%.0f h", hours) else String.format(locale, "%.1f h", hours)
 
-/** "1h 2m", "1 min 27 s" or "6 s". */
 internal fun holdDurationText(context: Context, millis: Long): String {
     val seconds = millis / 1000L
     return when {
