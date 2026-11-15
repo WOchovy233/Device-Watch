@@ -12,28 +12,15 @@ import org.jarsi.devicewatch.overlay.overlayPositionToStored
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * SharedPreferences-backed settings store. Deliberately synchronous: the stats
- * repository reads these inside its synchronous compute path (under the stats
- * mutex on the default dispatcher), and SharedPreferences values are memory-cached
- * after the first load — the same pattern the screensaver already uses with
- * [org.jarsi.devicewatch.system.DreamPreferences].
- */
 @Singleton
 class AppSettingsRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : AppSettingsRepository {
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    // Delivery on this phone is not a user setting. Neither backup rule file
-    // includes this file, so a new phone can deliver its own first alerts.
     private val alertState = context.getSharedPreferences(ALERT_STATE_PREFS_NAME, Context.MODE_PRIVATE)
 
     init {
-        // Older 1.6.0 candidates stored latches in the backed-up settings. We
-        // cannot tell an in-place update from a restore of that file, so discard
-        // those latches instead of migrating them. This may re-alert once after
-        // updating a candidate, but cannot silence a new phone's first alert.
         val legacyLatches = prefs.all.keys.filter {
             it.startsWith("$KEY_ALERT_LATCHED_PREFIX:") ||
                 it.startsWith("$KEY_DATA_QUOTA_NOTIFIED_PREFIX:")
@@ -70,16 +57,29 @@ class AppSettingsRepositoryImpl @Inject constructor(
         prefs.edit().putInt(KEY_CHARGE_LIMIT_PERCENT, coerceChargeLimit(value)).apply()
     }
 
+    // 🎯 新增：充电提醒声音开关（默认开启）
+    override fun chargeLimitPlaySound(): Boolean = 
+        prefs.getBoolean(KEY_CHARGE_LIMIT_PLAY_SOUND, true)
+
+    override fun setChargeLimitPlaySound(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_CHARGE_LIMIT_PLAY_SOUND, enabled).apply()
+    }
+
+    // 🎯 新增：充电提醒震动开关（默认开启）
+    override fun chargeLimitVibrate(): Boolean = 
+        prefs.getBoolean(KEY_CHARGE_LIMIT_VIBRATE, true)
+
+    override fun setChargeLimitVibrate(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_CHARGE_LIMIT_VIBRATE, enabled).apply()
+    }
+
     /** 0 means off; anything else lands on a slider stop between 50 % and 95 %. */
     private fun coerceChargeLimit(value: Int): Int {
         if (value <= 0) return 0
         val bounded = value.coerceIn(CHARGE_LIMIT_MIN, CHARGE_LIMIT_MAX)
-        // Nearest slider stop; both bounds are multiples of 5, so this stays in range.
         return ((bounded + 2) / 5) * 5
     }
 
-    // Stored as a Float: SharedPreferences has no Double, and a plan size in GB needs
-    // nothing finer than Float can represent.
     override fun dataQuotaGb(): Double =
         coerceDataQuota(prefs.getFloat(KEY_DATA_QUOTA_GB, 0f).toDouble())
 
@@ -88,8 +88,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
         val coerced = coerceDataQuota(value)
         val editor = prefs.edit().putFloat(KEY_DATA_QUOTA_GB, coerced.toFloat()).nextDataSettingsGeneration()
         if (coerced != dataQuotaGb()) {
-            // A changed quota makes the 80 %/100 % crossings new events — re-arm
-            // both latches instead of staying silent for the rest of the period.
             val latchEditor = alertState.edit()
             alertState.all.keys
                 .filter { it.startsWith("$KEY_DATA_QUOTA_NOTIFIED_PREFIX:") }
@@ -99,7 +97,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
         editor.apply()
     }
 
-    /** 0 means no quota; anything else is a plan size bounded to 1..500 GB. */
     private fun coerceDataQuota(value: Double): Double =
         if (value <= 0.0) 0.0 else value.coerceIn(DATA_QUOTA_MIN_GB, DATA_QUOTA_MAX_GB)
 
@@ -109,9 +106,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
 
     @Synchronized
     override fun setDataQuotaNotified(periodStartEpochDay: Long, quotaGb: Double, threshold: Int) {
-        // The keys are scoped to a period and a quota, so every period would
-        // otherwise leave booleans behind forever; latches for any other period or
-        // quota are pruned as this one is written.
         val currentPrefix = quotaNotifiedPrefix(periodStartEpochDay, quotaGb)
         val stale = alertState.all.keys.filter {
             it.startsWith("$KEY_DATA_QUOTA_NOTIFIED_PREFIX:") && !it.startsWith(currentPrefix)
@@ -129,7 +123,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
 
     override fun dataSettingsGeneration(): Long = prefs.getLong(KEY_DATA_SETTINGS_GENERATION, 0L)
 
-    /** Written in the same edit as the setting it versions, so the two can never disagree. */
     private fun SharedPreferences.Editor.nextDataSettingsGeneration(): SharedPreferences.Editor =
         putLong(KEY_DATA_SETTINGS_GENERATION, dataSettingsGeneration() + 1)
 
@@ -140,7 +133,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
         prefs.edit().putBoolean(KEY_APPS_OLDEST_FIRST, oldestFirst).apply()
     }
 
-    /** A flag about this phone, kept out of the backed-up settings ([DeviceLocalFlags]). */
     override fun onboardingShown(): Boolean =
         DeviceLocalFlags.prefs(context).getBoolean(KEY_ONBOARDING_SHOWN, false)
 
@@ -155,10 +147,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
         prefs.edit().putBoolean(KEY_CLASSIC_LOOK, enabled).apply()
     }
 
-    /**
-     * About this phone ([DeviceLocalFlags]): a restore onto another phone must not
-     * start asking it for root or Shizuku.
-     */
     override fun privilegedAccess(): PrivilegedAccess {
         val stored = DeviceLocalFlags.prefs(context).getString(KEY_PRIVILEGED_ACCESS, null)
         return PrivilegedAccess.entries.firstOrNull { it.name == stored } ?: PrivilegedAccess.OFF
@@ -169,9 +157,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
 
     override val privilegedAccessFlow: StateFlow<PrivilegedAccess> = access.asStateFlow()
 
-    // The monitor (root found gone) and the screen (root granted) can both write:
-    // the preference and the flow move under one lock, or the flow could end up
-    // one writer behind the setting.
     override fun setPrivilegedAccess(access: PrivilegedAccess) {
         synchronized(accessLock) {
             DeviceLocalFlags.prefs(context).edit().putString(KEY_PRIVILEGED_ACCESS, access.name).apply()
@@ -182,10 +167,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
     override fun alertEnabled(alert: HealthAlert): Boolean =
         prefs.getBoolean(alertKey(KEY_ALERT_ENABLED_PREFIX, alert), false)
 
-    // The switch and the latch share this object's lock: the switch comes from the
-    // UI, the latch from the monitor service, and a latch must never land after
-    // the switch that cleared it. apply() updates the in-memory map at once, so
-    // reads inside the lock always see the other side's write.
     @Synchronized
     override fun setAlertEnabled(alert: HealthAlert, enabled: Boolean) {
         val editor = prefs.edit()
@@ -213,7 +194,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
         alertState.edit().remove(alertKey(KEY_ALERT_LATCHED_PREFIX, alert)).apply()
     }
 
-    // In app_settings, so a restored phone shows the same figures.
     override fun notificationMetrics(): Set<QuickMetric> =
         quickMetricsOf(prefs.getString(KEY_NOTIFICATION_METRICS, null))
 
@@ -227,8 +207,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
         prefs.edit().putBoolean(KEY_TILE_VALUE_ICONS, enabled).apply()
     }
 
-    // The card's settings live in app_settings too, so a restored phone brings the card back
-    // the same; the monitor turns it off again if the restored phone lacks the permission.
     override fun overlayShown(): Boolean = prefs.getBoolean(KEY_OVERLAY_SHOWN, false)
 
     override fun setOverlayShown(shown: Boolean) {
@@ -236,7 +214,6 @@ class AppSettingsRepositoryImpl @Inject constructor(
         overlayShownState.value = shown
     }
 
-    // The monitor, the tile and Settings share this one instance, so the flow sees every change.
     private val overlayShownState = MutableStateFlow(overlayShown())
 
     override val overlayShownFlow: StateFlow<Boolean> = overlayShownState.asStateFlow()
@@ -266,16 +243,18 @@ class AppSettingsRepositoryImpl @Inject constructor(
         const val KEY_CYCLE_START_DAY = "cycle_start_day"
         const val KEY_APPS_OLDEST_FIRST = "apps_oldest_first"
         const val KEY_CHARGE_LIMIT_PERCENT = "charge_limit_percent"
+        
+        // 🎯 新增两个 Key
+        const val KEY_CHARGE_LIMIT_PLAY_SOUND = "charge_limit_play_sound"
+        const val KEY_CHARGE_LIMIT_VIBRATE = "charge_limit_vibrate"
+
         const val KEY_DATA_QUOTA_GB = "data_quota_gb"
-        /** Full key: "data_quota_notified:&lt;periodStartEpochDay&gt;:&lt;quotaGb&gt;:&lt;80|100&gt;". */
         const val KEY_DATA_QUOTA_NOTIFIED_PREFIX = "data_quota_notified"
         const val KEY_DATA_SETTINGS_GENERATION = "data_settings_generation"
         const val KEY_ONBOARDING_SHOWN = "onboarding_shown"
-        /** Written from the UI helpers in OnboardingPage.kt (permanent-denial detection). */
         const val KEY_RUNTIME_PERMISSIONS_REQUESTED = "runtime_permissions_requested"
         const val KEY_CLASSIC_LOOK = "classic_look"
         const val KEY_PRIVILEGED_ACCESS = "privileged_access"
-        /** Full keys: "alert_enabled:hot_battery", "alert_latched:low_storage" and so on. */
         const val KEY_ALERT_ENABLED_PREFIX = "alert_enabled"
         const val KEY_ALERT_LATCHED_PREFIX = "alert_latched"
         const val KEY_ALERT_GENERATION_PREFIX = "alert_generation"
